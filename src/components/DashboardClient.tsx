@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useEffect } from "react";
 import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
 
 export default function DashboardClient({ data }: { data: any }) {
@@ -22,6 +23,9 @@ export default function DashboardClient({ data }: { data: any }) {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [showNewSource, setShowNewSource] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [verifiedTime, setVerifiedTime] = useState<Date | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [liveTime, setLiveTime] = useState(new Date());
 
   // Commission logic states
   const [isCommission, setIsCommission] = useState(false);
@@ -50,10 +54,35 @@ export default function DashboardClient({ data }: { data: any }) {
     setPayingId(null);
   }
 
+  // Sync with Global Network Time
+  useEffect(() => {
+    async function syncTime() {
+      setIsSyncing(true);
+      try {
+        const response = await fetch("https://worldtimeapi.org/api/timezone/America/Sao_Paulo");
+        const data = await response.json();
+        const networkDate = new Date(data.datetime);
+        setVerifiedTime(networkDate);
+        setLiveTime(networkDate);
+      } catch (err) {
+        console.warn("Retrying time sync...", err);
+        setVerifiedTime(new Date());
+      }
+      setIsSyncing(false);
+    }
+    syncTime();
+
+    const interval = setInterval(() => {
+      setLiveTime(prev => new Date(prev.getTime() + 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const chartData = [
-    { day: "01 OUT", actual: kpis.accountBalance * 0.8, projected: kpis.accountBalance * 0.8 },
+    { day: "01 " + liveTime.toLocaleDateString("pt-BR", { month: 'short' }).toUpperCase(), actual: kpis.accountBalance * 0.8, projected: kpis.accountBalance * 0.8 },
     { day: "HOJE", actual: kpis.accountBalance, projected: kpis.accountBalance },
-    { day: "31 OUT", actual: null, projected: kpis.projectedBalance },
+    { day: liveTime.toLocaleDateString("pt-BR", { day: '2-digit', month: 'short' }).toUpperCase(), actual: null, projected: kpis.projectedBalance },
   ];
 
   async function handleSubmit(e: any) {
@@ -119,9 +148,16 @@ export default function DashboardClient({ data }: { data: any }) {
         <header className="h-20 border-b border-white/5 flex items-center justify-between px-6 lg:px-10 z-10 w-full shrink-0 bg-slate-900/20 backdrop-blur-md">
           <div className="flex items-center gap-4">
             <button className="flex items-center gap-2 bg-white/5 hover:bg-white/10 transition-colors px-3 py-1.5 rounded-lg border border-white/10">
-              <span className="material-symbols-outlined text-primary text-sm">calendar_month</span>
-              <span className="text-xs font-semibold uppercase tracking-wide">Outubro 2024</span>
-              <span className="material-symbols-outlined text-slate-500 text-sm">expand_more</span>
+              <span className={`material-symbols-outlined text-sm ${isSyncing ? "animate-spin text-primary" : "text-emerald-500"}`}>
+                {isSyncing ? "sync" : "public"}
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wide">
+                {liveTime.toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' })}
+              </span>
+              <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-xs font-mono font-bold text-white tabular-nums">
+                {liveTime.toLocaleTimeString("pt-BR")}
+              </span>
             </button>
           </div>
 
