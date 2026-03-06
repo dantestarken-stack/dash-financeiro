@@ -304,33 +304,80 @@ export default function DashboardClient({ data }: { data: any }) {
               </div>
 
               <form onSubmit={handleSubmit} className="p-5 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Movimentação</label>
-                  <select name="type" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white">
-                    <option value="expense">Despesa (Contas a Pagar)</option>
-                    <option value="income">Receita (A Receber / Entradas)</option>
-                  </select>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Movimentação</label>
+                    <select id="modal-type-select" name="type" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      onChange={(e) => {
+                        const form = e.target.closest('form');
+                        if (form) {
+                          const isExpense = e.target.value === 'expense';
+                          const catDiv = form.querySelector('#cat-container');
+                          const srcDiv = form.querySelector('#src-container');
+                          const natDiv = form.querySelector('#nat-container');
+                          if (catDiv && srcDiv && natDiv) {
+                            catDiv.classList.toggle('hidden', !isExpense);
+                            natDiv.classList.toggle('hidden', !isExpense);
+                            srcDiv.classList.toggle('hidden', isExpense);
+                          }
+                        }
+                      }}
+                    >
+                      <option value="expense">Despesa (A Pagar)</option>
+                      <option value="income">Receita (A Receber)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                  <input name="title" required type="text" placeholder="Ex: Cartão de Crédito, Salário..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                  <input name="title" required type="text" placeholder="Ex: Conta de Luz, Salário..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor Previsto (R$)</label>
-                    <input name="amount" required type="number" step="0.01" min="0" placeholder="0.00" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
+                    <input name="amount" required type="text" inputMode="decimal" placeholder="0,00 ou 3.000,00" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Data Vencimento</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
                     <input name="dueDate" required type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
                   </div>
                 </div>
 
-                <div className="pt-2 text-xs text-slate-500 bg-slate-50 p-3 rounded border border-slate-100">
-                  <span className="font-semibold block mb-1">Nota da Regra Financeira:</span>
-                  Novas receitas nascem como "Esperadas" e Novas despesas nascem como "Pendentes" (A vencer) indo para sua Projeção de Caixa sem afetar o saldo em conta livre real logo de cara.
+                {/* Container Dinâmicos usando classe hidden via JS acima ou React State (vamos via classe para simplificar) */}
+                <div id="cat-container">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Categoria da Despesa</label>
+                  <select name="categoryId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    {data.expenseCategories?.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div id="nat-container">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Natureza do Gasto</label>
+                  <select name="nature" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="essential">Custo Fixo / Essencial</option>
+                    <option value="important">Custo Variável / Importante</option>
+                    <option value="superfluous">Supérfluo</option>
+                  </select>
+                </div>
+
+                <div id="src-container" className="hidden">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Origem da Receita</label>
+                  <select name="incomeSourceId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    {data.incomeSources?.map((s: any) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="pt-2">
+                  <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 cursor-pointer">
+                    <input type="checkbox" name="isPaid" value="true" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer" />
+                    <span>Lançamento já está Efetivado (Pago/Recebido) na conta atual</span>
+                  </label>
                 </div>
 
                 <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">

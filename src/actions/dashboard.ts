@@ -115,6 +115,9 @@ export async function getDashboardData() {
         }))
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    const incomeSources = await prisma.incomeSource.findMany({ where: { userId: user.id } });
+    const expenseCategories = await prisma.expenseCategory.findMany({ where: { userId: user.id } });
+
     return {
         kpis: {
             accountBalance: accountBalance / 100,
@@ -128,5 +131,7 @@ export async function getDashboardData() {
         defaultAccountId: defaultAccount?.id,
         recentTransactions: [...mappedTransactions].reverse().slice(0, 5),
         allTransactions: mappedTransactions,
+        incomeSources,
+        expenseCategories,
     };
 }
