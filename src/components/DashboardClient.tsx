@@ -38,7 +38,7 @@ export default function DashboardClient({ data }: { data: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
 
-  const { kpis, recentTransactions, allTransactions, defaultAccountId } = data;
+  const { kpis, recentTransactions, allTransactions, defaultAccountId, spentByNature } = data;
 
   async function handleMarkPaid(id: string, type: "income" | "expense") {
     setPayingId(id);
@@ -65,6 +65,11 @@ export default function DashboardClient({ data }: { data: any }) {
     setIsSubmitting(false);
     setIsModalOpen(false);
   }
+
+  const totalSpentAndPending = kpis.paidExpense + kpis.pendingExpense;
+  const essentialPct = totalSpentAndPending ? (spentByNature.essential / totalSpentAndPending) * 100 : 0;
+  const importantPct = totalSpentAndPending ? (spentByNature.important / totalSpentAndPending) * 100 : 0;
+  const superfluousPct = totalSpentAndPending ? (spentByNature.superfluous / totalSpentAndPending) * 100 : 0;
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
@@ -231,6 +236,56 @@ export default function DashboardClient({ data }: { data: any }) {
                       ))}
                     </div>
                   </div>
+                </div>
+
+                {/* FAIXA 3: Análise de Custos e Supérfluos */}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-8 w-full">
+                  <div className="flex justify-between items-center mb-5">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-800">Eficiência de Controle (Despesas Totais: R$ {totalSpentAndPending.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})</h2>
+                      <p className="text-slate-500 text-sm">Visualize para onde está indo o seu dinheiro na proporção geral.</p>
+                    </div>
+                  </div>
+
+                  {totalSpentAndPending === 0 ? (
+                    <div className="text-sm text-slate-400 py-6 text-center">Nenhuma despesa para análise ainda.</div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Barra Visual */}
+                      <div className="w-full flex h-4 rounded-full overflow-hidden">
+                        <div style={{ width: `${essentialPct}%` }} className="bg-emerald-500 hover:opacity-90 transition-opacity" title="Fixos / Essenciais"></div>
+                        <div style={{ width: `${importantPct}%` }} className="bg-amber-500 hover:opacity-90 transition-opacity" title="Variáveis / Importantes"></div>
+                        <div style={{ width: `${superfluousPct}%` }} className="bg-rose-500 hover:opacity-90 transition-opacity" title="Supérfluos"></div>
+                      </div>
+
+                      {/* Legendas Embaixo */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mt-4">
+                        <div className="bg-emerald-50/50 p-3 rounded border border-emerald-100/50 flex flex-col justify-center">
+                          <div className="flex items-center text-slate-700 font-semibold mb-1">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span> Essenciais / Fixos
+                          </div>
+                          <span className="font-bold text-lg text-emerald-700">R$ {spentByNature.essential.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} <span className="text-sm font-medium opacity-70 ml-1">({essentialPct.toFixed(0)}%)</span></span>
+                          <span className="text-xs text-slate-500 mt-1 line-clamp-1">Moradia, mercado base, saúde, luz</span>
+                        </div>
+
+                        <div className="bg-amber-50/50 p-3 rounded border border-amber-100/50 flex flex-col justify-center">
+                          <div className="flex items-center text-slate-700 font-semibold mb-1">
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2"></span> Importantes / Variáveis
+                          </div>
+                          <span className="font-bold text-lg text-amber-700">R$ {spentByNature.important.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} <span className="text-sm font-medium opacity-70 ml-1">({importantPct.toFixed(0)}%)</span></span>
+                          <span className="text-xs text-slate-500 mt-1 line-clamp-1">Educação, roupas necessárias, bem-estar</span>
+                        </div>
+
+                        <div className="bg-rose-50/50 p-3 rounded border border-rose-100/50 flex flex-col justify-center">
+                          <div className="flex items-center text-slate-700 font-semibold mb-1">
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mr-2"></span> Supérfluos (Vazamento)
+                          </div>
+                          <span className="font-bold text-lg text-rose-700">R$ {spentByNature.superfluous.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} <span className="text-sm font-medium opacity-70 ml-1">({superfluousPct.toFixed(0)}%)</span></span>
+                          <span className="text-xs text-slate-500 mt-1 line-clamp-1">Ifood em excesso, impulsos, vícios</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}

@@ -82,11 +82,21 @@ export async function getDashboardData() {
     let paidExpense = 0;
     let pendingExpense = 0;
 
+    let spentByNature = {
+        essential: 0,
+        important: 0,
+        superfluous: 0
+    };
+
     expenses.forEach(e => {
         paidExpense += e.paidAmount;
         if (e.status === "pending" || e.status === "overdue" || e.status === "partial") {
             pendingExpense += (e.amount - e.paidAmount);
         }
+
+        if (e.nature === "essential") spentByNature.essential += e.amount;
+        else if (e.nature === "important") spentByNature.important += e.amount;
+        else if (e.nature === "superfluous") spentByNature.superfluous += e.amount;
     });
 
     const accountBalance = defaultAccount?.currentBalance || 0;
@@ -103,6 +113,7 @@ export async function getDashboardData() {
             date: e.dueDate.toISOString(), // toISOString para ordenação precisa no frontend
             displayDate: e.dueDate.toLocaleDateString("pt-BR"),
             status: e.status,
+            nature: e.nature, // enviando nature para o client
         })),
         ...incomes.map(i => ({
             id: i.id,
@@ -126,6 +137,11 @@ export async function getDashboardData() {
             paidExpense: paidExpense / 100,
             pendingExpense: pendingExpense / 100,
             projectedBalance: projectedBalance / 100,
+        },
+        spentByNature: {
+            essential: spentByNature.essential / 100,
+            important: spentByNature.important / 100,
+            superfluous: spentByNature.superfluous / 100,
         },
         user,
         defaultAccountId: defaultAccount?.id,
