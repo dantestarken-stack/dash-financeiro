@@ -139,6 +139,13 @@ export async function getDashboardData(year?: number, month?: number) {
     const incomeSources = await prisma.incomeSource.findMany({ where: { userId: user.id } });
     const expenseCategories = await prisma.expenseCategory.findMany({ where: { userId: user.id } });
 
+    const assets = await prisma.asset.findMany({ where: { userId: user.id } });
+    const liabilities = await prisma.liability.findMany({ where: { userId: user.id } });
+
+    const totalAssets = assets.reduce((acc, curr) => acc + curr.amount, 0);
+    const totalLiabilities = liabilities.reduce((acc, curr) => acc + curr.outstandingAmount, 0);
+    const netWorth = totalAssets - totalLiabilities;
+
     return {
         kpis: {
             accountBalance: accountBalance / 100,
@@ -148,6 +155,9 @@ export async function getDashboardData(year?: number, month?: number) {
             pendingExpense: pendingExpense / 100,
             projectedBalance: projectedBalance / 100,
             pendingCommissions: pendingCommissions / 100,
+            netWorth: netWorth / 100,
+            totalAssets: totalAssets / 100,
+            totalLiabilities: totalLiabilities / 100,
         },
         spentByNature: {
             essential: spentByNature.essential / 100,
@@ -160,5 +170,7 @@ export async function getDashboardData(year?: number, month?: number) {
         allTransactions: mappedTransactions,
         incomeSources,
         expenseCategories,
+        assets,
+        liabilities,
     };
 }

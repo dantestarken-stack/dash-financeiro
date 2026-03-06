@@ -12,11 +12,14 @@ import {
 } from "recharts";
 import { useRouter } from "next/navigation";
 import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
+import { createAsset, createLiability, deleteAsset, deleteLiability } from "@/actions/patrimony";
 
 export default function DashboardClient({ data, currentMonth, currentYear }: { data: any, currentMonth: number, currentYear: number }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [isLiabilityModalOpen, setIsLiabilityModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
 
@@ -98,6 +101,38 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
     setIsModalOpen(false);
   }
 
+  async function handleSubmitAsset(e: any) {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.target);
+    await createAsset(formData);
+    router.refresh();
+    setIsSubmitting(false);
+    setIsAssetModalOpen(false);
+  }
+
+  async function handleSubmitLiability(e: any) {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.target);
+    await createLiability(formData);
+    router.refresh();
+    setIsSubmitting(false);
+    setIsLiabilityModalOpen(false);
+  }
+
+  async function handleAssetDelete(id: string) {
+    if (!confirm("Remover este ativo?")) return;
+    await deleteAsset(id);
+    router.refresh();
+  }
+
+  async function handleLiabilityDelete(id: string) {
+    if (!confirm("Remover este passivo?")) return;
+    await deleteLiability(id);
+    router.refresh();
+  }
+
   return (
     <div className="flex h-screen bg-mesh text-slate-100 font-sans selection:bg-primary/30 overflow-hidden">
       <aside className="w-20 lg:w-64 bg-slate-900/40 backdrop-blur-xl border-r border-white/5 flex flex-col hidden md:flex shrink-0">
@@ -115,6 +150,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
           <NavItem icon="payments" label="Receitas" active={activeTab === "incomes"} onClick={() => setActiveTab("incomes")} />
           <NavItem icon="receipt_long" label="Despesas" active={activeTab === "expenses"} onClick={() => setActiveTab("expenses")} />
           <NavItem icon="calendar_month" label="Agenda" badge={recentTransactions.filter((r: any) => r.status === 'pending').length.toString()} active={activeTab === "agenda"} onClick={() => setActiveTab("agenda")} />
+          <NavItem icon="account_balance" label="Patrimônio" active={activeTab === "patrimony"} onClick={() => setActiveTab("patrimony")} />
         </nav>
       </aside>
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -216,6 +252,94 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                 </div>
               </div>
             )}
+
+            {activeTab === "patrimony" && (
+              <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div>
+                    <h2 className="text-3xl font-black text-white tracking-tight">Gestão de Patrimônio</h2>
+                    <p className="text-slate-400 text-sm font-medium mt-1">Sua posição líquida real consolidada.</p>
+                  </div>
+                  <div className="flex bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Patrimônio Líquido</span>
+                      <div className={`text-4xl font-black mt-1 ${kpis.netWorth >= 0 ? "text-white" : "text-danger"}`}>
+                        R$ {kpis.netWorth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* ASSETS */}
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center px-2">
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <span className="material-symbols-outlined text-success">account_balance</span>
+                        Meus Ativos (Bens)
+                      </h3>
+                      <button onClick={() => setIsAssetModalOpen(true)} className="text-xs font-black uppercase tracking-widest text-primary hover:text-white transition-colors flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">add</span> Adicionar Ativo
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {data.assets?.length === 0 ? (
+                        <div className="bg-white/5 border border-dashed border-white/10 rounded-3xl p-12 text-center text-slate-500 italic">Nenhum ativo declarado.</div>
+                      ) : data.assets.map((a: any) => (
+                        <div key={a.id} className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 flex justify-between items-center group">
+                          <div>
+                            <p className="text-sm font-black text-white">{a.name}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">{a.type}</p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-lg font-black text-success">R$ {(a.amount / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            <button onClick={() => handleAssetDelete(a.id)} className="w-8 h-8 rounded-lg bg-danger/10 text-danger opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center hover:bg-danger hover:text-white">
+                              <span className="material-symbols-outlined text-lg">delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* LIABILITIES */}
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center px-2">
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <span className="material-symbols-outlined text-danger">account_balance</span>
+                        Meus Passivos (Dívidas)
+                      </h3>
+                      <button onClick={() => setIsLiabilityModalOpen(true)} className="text-xs font-black uppercase tracking-widest text-primary hover:text-white transition-colors flex items-center gap-2">
+                        <span className="material-symbols-outlined text-sm">add</span> Adicionar Passivo
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {data.liabilities?.length === 0 ? (
+                        <div className="bg-white/5 border border-dashed border-white/10 rounded-3xl p-12 text-center text-slate-500 italic">Nenhuma dívida declarada.</div>
+                      ) : data.liabilities.map((l: any) => (
+                        <div key={l.id} className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 flex justify-between items-center group">
+                          <div>
+                            <p className="text-sm font-black text-white">{l.name}</p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">{l.type}</p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <span className="block text-lg font-black text-white">R$ {(l.outstandingAmount / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                              <span className="block text-[10px] text-slate-500 font-bold">PAGAMENTO MENSAL: R$ {(l.monthlyPayment / 100).toLocaleString('pt-BR')}</span>
+                            </div>
+                            <button onClick={() => handleLiabilityDelete(l.id)} className="w-8 h-8 rounded-lg bg-danger/10 text-danger opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center hover:bg-danger hover:text-white">
+                              <span className="material-symbols-outlined text-lg">delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <nav className="md:hidden fixed bottom-6 left-6 right-6 h-16 bg-slate-900/80 backdrop-blur-2xl border border-white/10 rounded-2xl flex items-center justify-around px-2 z-[100] shadow-2xl shadow-black">
@@ -282,6 +406,86 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
               <div className="flex items-center gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:text-white transition-colors">Cancelar</button>
                 <button disabled={isSubmitting} type="submit" className="flex-[2] h-12 bg-primary text-white rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50">{isSubmitting ? "Gravando..." : "Confirmar"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ASSET MODAL */}
+      {isAssetModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsAssetModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-8 text-center text-success">Novo Ativo</h3>
+            <form onSubmit={handleSubmitAsset} className="space-y-6">
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Nome do Ativo (Carro, Imóvel, BTC...)</label>
+                <input required name="name" placeholder="Ex: Porsche 911" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-success transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Tipo</label>
+                  <select name="type" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-success transition-all text-sm">
+                    <option value="Imóvel">Imóvel</option>
+                    <option value="Veículo">Veículo</option>
+                    <option value="Investimento">Investimento</option>
+                    <option value="Cripto">Cripto</option>
+                  </select>
+                </div>
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Valor Avaliado (R$)</label>
+                  <input required name="amount" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-success transition-all font-bold" />
+                </div>
+              </div>
+              <div className="flex items-center gap-4 pt-4">
+                <button type="button" onClick={() => setIsAssetModalOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:text-white transition-colors">Cancelar</button>
+                <button disabled={isSubmitting} type="submit" className="flex-[2] h-12 bg-success text-white rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-success/20 hover:scale-[1.02] transition-all disabled:opacity-50">{isSubmitting ? "Gravando..." : "Confirmar Ativo"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* LIABILITY MODAL */}
+      {isLiabilityModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsLiabilityModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-8 text-center text-danger">Novo Passivo</h3>
+            <form onSubmit={handleSubmitLiability} className="space-y-6">
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Nome do Passivo (Empréstimo, Financiamento...)</label>
+                <input required name="name" placeholder="Ex: Financiamento Casa" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-danger transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Tipo</label>
+                  <select name="type" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-danger transition-all text-sm">
+                    <option value="Financiamento">Financiamento</option>
+                    <option value="Empréstimo">Empréstimo</option>
+                    <option value="Cartão">Cartão</option>
+                    <option value="Outro">Outro</option>
+                  </select>
+                </div>
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Valor Restante (R$)</label>
+                  <input required name="outstandingAmount" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-danger transition-all font-bold" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Valor Total Original (R$)</label>
+                  <input required name="totalAmount" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-danger transition-all font-bold" />
+                </div>
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Parcela Mensal (R$)</label>
+                  <input required name="monthlyPayment" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-danger transition-all font-bold" />
+                </div>
+              </div>
+              <div className="flex items-center gap-4 pt-4">
+                <button type="button" onClick={() => setIsLiabilityModalOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:text-white transition-colors">Cancelar</button>
+                <button disabled={isSubmitting} type="submit" className="flex-[2] h-12 bg-danger text-white rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-danger/20 hover:scale-[1.02] transition-all disabled:opacity-50">{isSubmitting ? "Gravando..." : "Confirmar Passivo"}</button>
               </div>
             </form>
           </div>
