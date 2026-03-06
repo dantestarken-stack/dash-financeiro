@@ -20,6 +20,8 @@ import {
   CreditCard,
   Building2,
   X,
+  Trash2,
+  Calculator,
 } from "lucide-react";
 import {
   AreaChart,
@@ -30,7 +32,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { createTransaction, markTransactionAsPaid } from "@/actions/transaction";
+import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
 
 export default function DashboardClient({ data }: { data: any }) {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -41,8 +43,28 @@ export default function DashboardClient({ data }: { data: any }) {
   const [txType, setTxType] = useState("expense");
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [showNewSource, setShowNewSource] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Commission logic states
+  const [isCommission, setIsCommission] = useState(false);
+  const [contractValue, setContractValue] = useState("");
+  const [commissionPct, setCommissionPct] = useState("10");
+
+  let computedAmount = "";
+  if (isCommission && contractValue && commissionPct) {
+    const cv = parseFloat(contractValue.replace(/\./g, "").replace(",", ".") || "0");
+    const pct = parseFloat(commissionPct || "0");
+    computedAmount = ((cv * pct) / 100).toLocaleString("pt-br", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   const { kpis, recentTransactions, allTransactions, defaultAccountId, spentByNature } = data;
+
+  async function handleDelete(id: string, type: "income" | "expense") {
+    if (!confirm("Certeza que deseja apagar este lançamento?")) return;
+    setDeletingId(id);
+    await deleteTransaction(id, type);
+    setDeletingId(null);
+  }
 
   async function handleMarkPaid(id: string, type: "income" | "expense") {
     setPayingId(id);
@@ -294,6 +316,72 @@ export default function DashboardClient({ data }: { data: any }) {
               </>
             )}
 
+            {activeTab === "incomes" && (
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Gestão de Receitas</h1>
+                  <p className="text-slate-500 text-sm mt-1">Acompanhe suas entradas previstas e realizadas.</p>
+                </div>
+                <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Total A Receber (Previsto)</span>
+                    <h3 className="text-2xl font-extrabold tracking-tight text-amber-500">R$ {kpis.remainingIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
+                  </div>
+                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Total Recebido (Efetivo)</span>
+                    <h3 className="text-2xl font-extrabold tracking-tight text-emerald-500">R$ {kpis.actualIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
+                  </div>
+                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Soma Total (Mês)</span>
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">R$ {(kpis.remainingIncome + kpis.actualIncome).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
+                  </div>
+                </section>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-hidden">
+                  <h3 className="font-bold text-lg mb-4">Lançamentos de Receita</h3>
+                  <div className="space-y-4">
+                    {allTransactions.filter((t: any) => t.type === "income").length === 0 ? (
+                      <div className="text-sm text-slate-400 text-center py-10">Nenhuma receita lançada.</div>
+                    ) : allTransactions.filter((t: any) => t.type === "income").map((t: any) => (
+                      <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "expenses" && (
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Gestão de Despesas</h1>
+                  <p className="text-slate-500 text-sm mt-1">Controle seus custos e avalie seu nível de gastos.</p>
+                </div>
+                <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Agendado (A Pagar)</span>
+                    <h3 className="text-2xl font-extrabold tracking-tight text-amber-500">R$ {kpis.pendingExpense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
+                  </div>
+                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Liquidado (Pago)</span>
+                    <h3 className="text-2xl font-extrabold tracking-tight text-rose-500">R$ {kpis.paidExpense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
+                  </div>
+                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Custos Totais (Mês)</span>
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">R$ {(kpis.pendingExpense + kpis.paidExpense).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
+                  </div>
+                </section>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-hidden">
+                  <h3 className="font-bold text-lg mb-4">Lançamentos de Despesa</h3>
+                  <div className="space-y-4">
+                    {allTransactions.filter((t: any) => t.type === "expense").length === 0 ? (
+                      <div className="text-sm text-slate-400 text-center py-10">Nenhuma despesa lançada.</div>
+                    ) : allTransactions.filter((t: any) => t.type === "expense").map((t: any) => (
+                      <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === "agenda" && (
               <div className="space-y-6">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -310,39 +398,7 @@ export default function DashboardClient({ data }: { data: any }) {
                         Sua agenda está vazia para este mês.
                       </div>
                     ) : allTransactions.map((t: any) => (
-                      <div key={t.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all group">
-                        <div className="flex items-start sm:items-center mb-4 sm:mb-0">
-                          <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center mr-4 ${t.type === "income" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-                            }`}>
-                            {t.type === "income" ? <ArrowDownToLine className="w-5 h-5" /> : <ArrowUpFromLine className="w-5 h-5" />}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-800 text-base">{t.name}</p>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span className={`px-2 py-0.5 rounded font-semibold text-[10px] uppercase tracking-wider ${t.status === "received" || t.status === "paid" ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-700"
-                                }`}>{t.status === "expected" || t.status === "pending" ? "A vencer/esperado" : t.status === "received" || t.status === "paid" ? "Baixado" : t.status}</span>
-                              <span className="text-xs font-medium text-slate-500">Vencimento: {t.displayDate}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto mt-2 sm:mt-0 space-x-4 pl-14 sm:pl-0">
-                          <div className={`font-bold text-lg tracking-tight ${t.type === "income" ? "text-emerald-600" : "text-slate-900"
-                            }`}>
-                            {t.type === "income" ? "+" : "-"} R$ {Math.abs(t.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                          </div>
-
-                          {(t.status === "pending" || t.status === "expected") && (
-                            <button
-                              disabled={payingId === t.id}
-                              onClick={() => handleMarkPaid(t.id, t.type)}
-                              className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm"
-                            >
-                              {payingId === t.id ? "Marcando..." : (t.type === "income" ? "Dar Baixa" : "Pagar Conta")}
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                      <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
                     ))}
                   </div>
                 </div>
@@ -352,136 +408,223 @@ export default function DashboardClient({ data }: { data: any }) {
         </div>
 
         {/* MODAL DE NOVO LANÇAMENTO (OVERLAY) */}
-        {isModalOpen && (
-          <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden relative">
-              <div className="flex items-center justify-between p-5 border-b border-slate-100">
-                <h3 className="font-bold text-lg">Novo Lançamento</h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="p-5 space-y-4">
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Movimentação</label>
-                    <select id="modal-type-select" name="type" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
-                      value={txType}
-                      onChange={(e) => setTxType(e.target.value)}
-                    >
-                      <option value="expense">Despesa (A Pagar)</option>
-                      <option value="income">Receita (A Receber)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                  <input name="title" required list="title-suggestions" type="text" placeholder="Ex: Conta de Luz, Salário..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                  <datalist id="title-suggestions">
-                    {txType === "expense" ? (
-                      <>
-                        <option value="Energia Elétrica" />
-                        <option value="Aluguel" />
-                        <option value="Água" />
-                        <option value="Internet / Celular" />
-                        <option value="Mercado" />
-                        <option value="Ifood" />
-                        <option value="Combustível" />
-                        <option value="Streaming (Netflix/Spotify)" />
-                        <option value="Outros" />
-                      </>
-                    ) : (
-                      <>
-                        <option value="Salário Mensal" />
-                        <option value="Comissão" />
-                        <option value="Bonus" />
-                        <option value="Outros" />
-                      </>
-                    )}
-                  </datalist>
-                </div>
-
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
-                    <input name="amount" required type="text" inputMode="decimal" placeholder="0,00 ou 3.000,00" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                    <input name="dueDate" required type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                  </div>
-                </div>
-
-                {txType === "expense" && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Categoria da Despesa</label>
-                      <select name="categoryId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-                        onChange={(e) => setShowNewCategory(e.target.value === "NEW")}
-                      >
-                        {data.expenseCategories?.map((c: any) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                        <option value="NEW">+ Criar Nova Categoria...</option>
-                      </select>
-                      {showNewCategory && (
-                        <input name="newCategoryName" required type="text" placeholder="Nome da nova categoria" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Natureza do Gasto</label>
-                      <select name="nature" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-                        <option value="essential">Custo Fixo / Essencial</option>
-                        <option value="important">Custo Variável / Importante</option>
-                        <option value="superfluous">Supérfluo</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-
-                {txType === "income" && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Origem da Receita</label>
-                    <select name="incomeSourceId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-                      onChange={(e) => setShowNewSource(e.target.value === "NEW")}
-                    >
-                      {data.incomeSources?.map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                      <option value="NEW">+ Criar Nova Fonte...</option>
-                    </select>
-                    {showNewSource && (
-                      <input name="newSourceName" required type="text" placeholder="Nome da nova fonte de receita" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                    )}
-                  </div>
-                )}
-
-                <div className="pt-2">
-                  <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 cursor-pointer">
-                    <input type="checkbox" name="isPaid" value="true" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer" />
-                    <span>Lançamento já está Efetivado (Pago/Recebido) na conta atual</span>
-                  </label>
-                </div>
-
-                <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                    {isSubmitting ? "Processando..." : "Gravar Lançamento"}
+        {
+          isModalOpen && (
+            <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden relative">
+                <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                  <h3 className="font-bold text-lg">Novo Lançamento</h3>
+                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700">
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-              </form>
+
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Movimentação</label>
+                      <select id="modal-type-select" name="type" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        value={txType}
+                        onChange={(e) => setTxType(e.target.value)}
+                      >
+                        <option value="expense">Despesa (A Pagar)</option>
+                        <option value="income">Receita (A Receber)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
+                    <input name="title" required list="title-suggestions" type="text" placeholder="Ex: Conta de Luz, Salário..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                    <datalist id="title-suggestions">
+                      {txType === "expense" ? (
+                        <>
+                          <option value="Energia Elétrica" />
+                          <option value="Aluguel" />
+                          <option value="Água" />
+                          <option value="Internet / Celular" />
+                          <option value="Mercado" />
+                          <option value="Ifood" />
+                          <option value="Combustível" />
+                          <option value="Streaming (Netflix/Spotify)" />
+                          <option value="Outros" />
+                        </>
+                      ) : (
+                        <>
+                          <option value="Salário Mensal" />
+                          <option value="Comissão" />
+                          <option value="Bonus" />
+                          <option value="Outros" />
+                        </>
+                      )}
+                    </datalist>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Valor {isCommission ? "Calculado" : "(R$)"}</label>
+                      {isCommission ? (
+                        <input name="amount" required type="text" readOnly value={computedAmount} className="w-full border border-blue-300 bg-blue-50/50 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 font-bold text-blue-800" />
+                      ) : (
+                        <input name="amount" required type="text" inputMode="decimal" placeholder="0,00 ou 3.000,00" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
+                      <input name="dueDate" required type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+                  </div>
+
+                  {txType === "income" && (
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      <label className="flex items-center space-x-2 text-sm font-bold text-slate-700 cursor-pointer">
+                        <input type="checkbox" checked={isCommission} onChange={(e) => setIsCommission(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer" />
+                        <span>Calcular Comissão (Venda/Contrato)</span>
+                      </label>
+
+                      {isCommission && (
+                        <div className="mt-3 flex gap-4">
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Valor da 1ª Parcela ou Contrato (R$)</label>
+                            <input type="text" value={contractValue} onChange={(e) => setContractValue(e.target.value)} placeholder="0,00" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
+                          </div>
+                          <div className="w-24">
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Sua %</label>
+                            <select value={commissionPct} onChange={(e) => setCommissionPct(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                              <option value="10">10%</option>
+                              <option value="15">15%</option>
+                              <option value="20">20%</option>
+                              <option value="25">25%</option>
+                              <option value="30">30%</option>
+                              <option value="35">35%</option>
+                              <option value="40">40%</option>
+                              <option value="45">45%</option>
+                              <option value="50">50%</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {txType === "expense" && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Categoria da Despesa</label>
+                        <select name="categoryId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+                          onChange={(e) => setShowNewCategory(e.target.value === "NEW")}
+                        >
+                          {data.expenseCategories?.map((c: any) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                          <option value="NEW">+ Criar Nova Categoria...</option>
+                        </select>
+                        {showNewCategory && (
+                          <input name="newCategoryName" required type="text" placeholder="Nome da nova categoria" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Natureza do Gasto</label>
+                        <select name="nature" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                          <option value="essential">Custo Fixo / Essencial</option>
+                          <option value="important">Custo Variável / Importante</option>
+                          <option value="superfluous">Supérfluo</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {txType === "income" && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Origem da Receita</label>
+                      <select name="incomeSourceId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+                        onChange={(e) => setShowNewSource(e.target.value === "NEW")}
+                      >
+                        {data.incomeSources?.map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                        <option value="NEW">+ Criar Nova Fonte...</option>
+                      </select>
+                      {showNewSource && (
+                        <input name="newSourceName" required type="text" placeholder="Nome da nova fonte de receita" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                      )}
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 cursor-pointer">
+                      <input type="checkbox" name="isPaid" value="true" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer" />
+                      <span>Lançamento já está Efetivado (Pago/Recebido) na conta atual</span>
+                    </label>
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                    <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                      {isSubmitting ? "Processando..." : "Gravar Lançamento"}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
       </main>
     </div>
   );
 }
 
 // Subcomponents helper
+
+function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete }: any) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all group">
+      <div className="flex items-start sm:items-center mb-4 sm:mb-0">
+        <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center mr-4 ${t.type === "income" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+          }`}>
+          {t.type === "income" ? <ArrowDownToLine className="w-5 h-5" /> : <ArrowUpFromLine className="w-5 h-5" />}
+        </div>
+        <div>
+          <p className="font-bold text-slate-800 text-base">{t.name}</p>
+          <div className="flex items-center space-x-2 mt-1">
+            <span className={`px-2 py-0.5 rounded font-semibold text-[10px] uppercase tracking-wider ${t.status === "received" || t.status === "paid" ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-700"
+              }`}>{t.status === "expected" || t.status === "pending" ? "A vencer/esperado" : t.status === "received" || t.status === "paid" ? "Baixado" : t.status}</span>
+            <span className="text-xs font-medium text-slate-500">Vencimento: {t.displayDate}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto mt-2 sm:mt-0 space-x-4 pl-14 sm:pl-0">
+        <div className={`font-bold text-lg tracking-tight ${t.type === "income" ? "text-emerald-600" : "text-slate-900"
+          }`}>
+          {t.type === "income" ? "+" : "-"} R$ {Math.abs(t.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {(t.status === "pending" || t.status === "expected") && (
+            <button
+              disabled={payingId === t.id}
+              onClick={() => handleMarkPaid(t.id, t.type)}
+              className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm"
+            >
+              {payingId === t.id ? "Marcando..." : (t.type === "income" ? "Dar Baixa" : "Pagar Conta")}
+            </button>
+          )}
+
+          <button
+            disabled={deletingId === t.id}
+            onClick={() => handleDelete(t.id, t.type)}
+            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+            title="Excluir Lançamento"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function NavItem({ icon, label, active, badge, onClick }: any) {
   return (

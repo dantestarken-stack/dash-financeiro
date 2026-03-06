@@ -155,3 +155,33 @@ export async function markTransactionAsPaid(id: string, type: "income" | "expens
     revalidatePath("/");
     return { success: true };
 }
+
+export async function deleteTransaction(id: string, type: "income" | "expense") {
+    const user = await prisma.user.findFirst();
+    if (!user) throw new Error("Usuário não encontrado");
+
+    if (type === "expense") {
+        const doc = await prisma.expense.findUnique({ where: { id, userId: user.id } });
+        if (doc && doc.status === "paid" && doc.accountId) {
+            // Estorna o valor pago da conta
+            await prisma.account.update({
+                where: { id: doc.accountId },
+                data: { currentBalance: { increment: doc.paidAmount } }
+            });
+        }
+        await prisma.expense.delete({ where: { id, userId: user.id } });
+    } else {
+        const doc = await prisma.income.findUnique({ where: { id, userId: user.id } });
+        if (doc && doc.status === "received" && doc.accountId) {
+            // Estorna o valor recebido da conta
+            await prisma.account.update({
+                where: { id: doc.accountId },
+                data: { currentBalance: { decrement: doc.receivedAmount } }
+            });
+        }
+        await prisma.income.delete({ where: { id, userId: user.id } });
+    }
+
+    revalidatePath("/");
+    return { success: true };
+}
