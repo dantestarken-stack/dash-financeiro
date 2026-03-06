@@ -38,6 +38,10 @@ export default function DashboardClient({ data }: { data: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
 
+  const [txType, setTxType] = useState("expense");
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [showNewSource, setShowNewSource] = useState(false);
+
   const { kpis, recentTransactions, allTransactions, defaultAccountId, spentByNature } = data;
 
   async function handleMarkPaid(id: string, type: "income" | "expense") {
@@ -363,20 +367,8 @@ export default function DashboardClient({ data }: { data: any }) {
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Movimentação</label>
                     <select id="modal-type-select" name="type" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
-                      onChange={(e) => {
-                        const form = e.target.closest('form');
-                        if (form) {
-                          const isExpense = e.target.value === 'expense';
-                          const catDiv = form.querySelector('#cat-container');
-                          const srcDiv = form.querySelector('#src-container');
-                          const natDiv = form.querySelector('#nat-container');
-                          if (catDiv && srcDiv && natDiv) {
-                            catDiv.classList.toggle('hidden', !isExpense);
-                            natDiv.classList.toggle('hidden', !isExpense);
-                            srcDiv.classList.toggle('hidden', isExpense);
-                          }
-                        }
-                      }}
+                      value={txType}
+                      onChange={(e) => setTxType(e.target.value)}
                     >
                       <option value="expense">Despesa (A Pagar)</option>
                       <option value="income">Receita (A Receber)</option>
@@ -386,7 +378,29 @@ export default function DashboardClient({ data }: { data: any }) {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                  <input name="title" required type="text" placeholder="Ex: Conta de Luz, Salário..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                  <input name="title" required list="title-suggestions" type="text" placeholder="Ex: Conta de Luz, Salário..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                  <datalist id="title-suggestions">
+                    {txType === "expense" ? (
+                      <>
+                        <option value="Energia Elétrica" />
+                        <option value="Aluguel" />
+                        <option value="Água" />
+                        <option value="Internet / Celular" />
+                        <option value="Mercado" />
+                        <option value="Ifood" />
+                        <option value="Combustível" />
+                        <option value="Streaming (Netflix/Spotify)" />
+                        <option value="Outros" />
+                      </>
+                    ) : (
+                      <>
+                        <option value="Salário Mensal" />
+                        <option value="Comissão" />
+                        <option value="Bonus" />
+                        <option value="Outros" />
+                      </>
+                    )}
+                  </datalist>
                 </div>
 
                 <div className="flex gap-4">
@@ -400,33 +414,50 @@ export default function DashboardClient({ data }: { data: any }) {
                   </div>
                 </div>
 
-                {/* Container Dinâmicos usando classe hidden via JS acima ou React State (vamos via classe para simplificar) */}
-                <div id="cat-container">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Categoria da Despesa</label>
-                  <select name="categoryId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    {data.expenseCategories?.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {txType === "expense" && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Categoria da Despesa</label>
+                      <select name="categoryId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+                        onChange={(e) => setShowNewCategory(e.target.value === "NEW")}
+                      >
+                        {data.expenseCategories?.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                        <option value="NEW">+ Criar Nova Categoria...</option>
+                      </select>
+                      {showNewCategory && (
+                        <input name="newCategoryName" required type="text" placeholder="Nome da nova categoria" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                      )}
+                    </div>
 
-                <div id="nat-container">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Natureza do Gasto</label>
-                  <select name="nature" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="essential">Custo Fixo / Essencial</option>
-                    <option value="important">Custo Variável / Importante</option>
-                    <option value="superfluous">Supérfluo</option>
-                  </select>
-                </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Natureza do Gasto</label>
+                      <select name="nature" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                        <option value="essential">Custo Fixo / Essencial</option>
+                        <option value="important">Custo Variável / Importante</option>
+                        <option value="superfluous">Supérfluo</option>
+                      </select>
+                    </div>
+                  </>
+                )}
 
-                <div id="src-container" className="hidden">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Origem da Receita</label>
-                  <select name="incomeSourceId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    {data.incomeSources?.map((s: any) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {txType === "income" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Origem da Receita</label>
+                    <select name="incomeSourceId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+                      onChange={(e) => setShowNewSource(e.target.value === "NEW")}
+                    >
+                      {data.incomeSources?.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                      <option value="NEW">+ Criar Nova Fonte...</option>
+                    </select>
+                    {showNewSource && (
+                      <input name="newSourceName" required type="text" placeholder="Nome da nova fonte de receita" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
+                    )}
+                  </div>
+                )}
 
                 <div className="pt-2">
                   <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 cursor-pointer">

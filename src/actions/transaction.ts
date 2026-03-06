@@ -14,6 +14,9 @@ export async function createTransaction(formData: FormData) {
     const nature = formData.get("nature") as string || "essential";
     const isPaid = formData.get("isPaid") === "true"; // Checkbox opcional: "Já está pago/recebido"
 
+    const newCategoryName = formData.get("newCategoryName") as string;
+    const newSourceName = formData.get("newSourceName") as string;
+
     // As data vêm de input date (YYYY-MM-DD)
     const dueDateStr = formData.get("dueDate") as string;
 
@@ -32,7 +35,15 @@ export async function createTransaction(formData: FormData) {
     if (!user) throw new Error("Usuário não encontrado");
 
     if (type === "income") {
-        const sourceId = incomeSourceId || (await prisma.incomeSource.findFirst({ where: { userId: user.id } }))?.id;
+        let finalSourceId = incomeSourceId;
+        if (finalSourceId === "NEW" && newSourceName) {
+            const newSrc = await prisma.incomeSource.create({
+                data: { userId: user.id, name: newSourceName, type: "other" }
+            });
+            finalSourceId = newSrc.id;
+        }
+
+        const sourceId = finalSourceId || (await prisma.incomeSource.findFirst({ where: { userId: user.id } }))?.id;
         if (!sourceId) return { error: "Sem fonte de renda para apontar" };
 
         const currentStatus = isPaid ? "received" : "expected";
@@ -60,7 +71,15 @@ export async function createTransaction(formData: FormData) {
             });
         }
     } else if (type === "expense") {
-        const catId = categoryId || (await prisma.expenseCategory.findFirst({ where: { userId: user.id } }))?.id;
+        let finalCatId = categoryId;
+        if (finalCatId === "NEW" && newCategoryName) {
+            const newCat = await prisma.expenseCategory.create({
+                data: { userId: user.id, name: newCategoryName }
+            });
+            finalCatId = newCat.id;
+        }
+
+        const catId = finalCatId || (await prisma.expenseCategory.findFirst({ where: { userId: user.id } }))?.id;
         if (!catId) return { error: "Sem categoria para apontar" };
 
         const currentStatus = isPaid ? "paid" : "pending";
