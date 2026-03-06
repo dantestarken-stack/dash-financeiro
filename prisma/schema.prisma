@@ -1,0 +1,362 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// USER & PROFILE
+// -----------------------------------------------------------------------------
+
+model User {
+  id                  String       @id @default(uuid())
+  name                String
+  email               String       @unique
+  passwordHash        String
+  isActive            Boolean      @default(true)
+  onboardingCompleted Boolean      @default(false)
+  lastLoginAt         DateTime?
+  
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  profile             UserProfile?
+  accounts            Account[]
+  cards               Card[]
+  incomeSources       IncomeSource[]
+  expenseCategories   ExpenseCategory[]
+  incomes             Income[]
+  expenses            Expense[]
+  recurringRules      RecurringRule[]
+  installmentGroups   InstallmentGroup[]
+  goals               Goal[]
+  assets              Asset[]
+  liabilities         Liability[]
+  alerts              Alert[]
+  tags                Tag[]
+}
+
+model UserProfile {
+  id                     String   @id @default(uuid())
+  userId                 String   @unique
+  monthlyFixedIncome     Int      @default(0)
+  usesCommissionIncome   Boolean  @default(false)
+  preferredCurrency      String   @default("BRL")
+  timezone               String   @default("America/Sao_Paulo")
+  locale                 String   @default("pt-BR")
+  savingsGoalPercentage  Int      @default(0)
+  financialPriority      String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// BANKING & CARDS
+// -----------------------------------------------------------------------------
+
+model Account {
+  id             String    @id @default(uuid())
+  userId         String
+  name           String
+  type           String
+  institutionName String?
+  currentBalance Int       @default(0)
+  initialBalance Int       @default(0)
+  color          String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards          Card[]
+  incomes        Income[]
+  expenses       Expense[]
+}
+
+model Card {
+  id          String   @id @default(uuid())
+  userId      String
+  accountId   String?
+  name        String
+  brand       String?
+  limitAmount Int      @default(0)
+  closingDay  Int
+  dueDay      Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account     Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  expenses    Expense[]
+}
+
+// -----------------------------------------------------------------------------
+// TAXONOMY
+// -----------------------------------------------------------------------------
+
+model IncomeSource {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  type      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomes   Income[]
+}
+
+model ExpenseCategory {
+  id            String              @id @default(uuid())
+  userId        String
+  name          String
+  icon          String?
+  color         String?
+  isDefault     Boolean             @default(false)
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subcategories ExpenseSubcategory[]
+  expenses      Expense[]
+}
+
+model ExpenseSubcategory {
+  id          String          @id @default(uuid())
+  categoryId  String
+  userId      String
+  name        String
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  txnTags   TransactionTag[]
+}
+
+model TransactionTag {
+  id                  String   @id @default(uuid())
+  tagId               String
+  relatedEntityType   String
+  relatedEntityId     String
+  createdAt           DateTime @default(now())
+  tag                 Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@unique([tagId, relatedEntityType, relatedEntityId])
+}
+
+// -----------------------------------------------------------------------------
+// TRANSACTIONS
+// -----------------------------------------------------------------------------
+
+model Income {
+  id               String   @id @default(uuid())
+  userId           String
+  accountId        String
+  incomeSourceId   String
+  title            String
+  description      String?
+  expectedAmount   Int
+  receivedAmount   Int      @default(0)
+  type             String
+  status           String
+  dueDate          DateTime
+  receivedDate     DateTime?
+  competencyDate   DateTime
+  isRecurring      Boolean  @default(false)
+  recurringRuleId  String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  deletedAt        DateTime?
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account          Account        @relation(fields: [accountId], references: [id])
+  incomeSource     IncomeSource   @relation(fields: [incomeSourceId], references: [id])
+  recurringRule    RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+}
+
+model Expense {
+  id                 String   @id @default(uuid())
+  userId             String
+  accountId          String?
+  cardId             String?
+  categoryId         String
+  subcategoryId      String?
+  title              String
+  description        String?
+  amount             Int
+  paidAmount         Int      @default(0)
+  paymentMethod      String
+  nature             String
+  status             String
+  purchaseDate       DateTime
+  dueDate            DateTime
+  paidDate           DateTime?
+  competencyDate     DateTime
+  merchantName       String?
+  isRecurring        Boolean  @default(false)
+  recurringRuleId    String?
+  isInstallment      Boolean  @default(false)
+  installmentGroupId String?
+  installmentNumber  Int?
+  totalInstallments  Int?
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account            Account?            @relation(fields: [accountId], references: [id])
+  card               Card?               @relation(fields: [cardId], references: [id])
+  category           ExpenseCategory     @relation(fields: [categoryId], references: [id])
+  subcategory        ExpenseSubcategory? @relation(fields: [subcategoryId], references: [id])
+  recurringRule      RecurringRule?      @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+  installmentGroup   InstallmentGroup?   @relation(fields: [installmentGroupId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// AGENTS
+// -----------------------------------------------------------------------------
+
+model RecurringRule {
+  id                String   @id @default(uuid())
+  userId            String
+  entityType        String
+  frequency         String
+  intervalValue     Int      @default(1)
+  startDate         DateTime
+  endDate           DateTime?
+  nextRunDate       DateTime
+  autoCreateEnabled Boolean   @default(true)
+  lastGeneratedAt   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomes           Income[]
+  expenses          Expense[]
+}
+
+model InstallmentGroup {
+  id                String   @id @default(uuid())
+  userId            String
+  title             String
+  totalAmount       Int
+  totalInstallments Int
+  firstDueDate      DateTime
+  accountId         String?
+  cardId            String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses          Expense[]
+}
+
+// -----------------------------------------------------------------------------
+// WEALTH
+// -----------------------------------------------------------------------------
+
+model Goal {
+  id                 String   @id @default(uuid())
+  userId             String
+  title              String
+  description        String?
+  type               String
+  targetAmount       Int
+  currentAmount      Int      @default(0)
+  monthlyTargetAmount Int?
+  startDate          DateTime
+  targetDate         DateTime
+  status             String
+  priority           Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Asset {
+  id            String   @id @default(uuid())
+  userId        String
+  name          String
+  type          String
+  amount        Int
+  valuationDate DateTime
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Liability {
+  id                String   @id @default(uuid())
+  userId            String
+  name              String
+  type              String
+  totalAmount       Int
+  outstandingAmount Int
+  monthlyPayment    Int
+  interestRate      Float?
+  dueDate           DateTime?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// SYSTEM
+// -----------------------------------------------------------------------------
+
+model Alert {
+  id                String   @id @default(uuid())
+  userId            String
+  type              String
+  title             String
+  description       String
+  severity          String
+  relatedEntityType String?
+  relatedEntityId   String?
+  isRead            Boolean  @default(false)
+  triggeredAt       DateTime
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Attachment {
+  id                String   @id @default(uuid())
+  userId            String
+  relatedEntityType String
+  relatedEntityId   String
+  fileName          String
+  fileUrl           String
+  mimeType          String
+  fileSize          Int
+  createdAt         DateTime @default(now())
+}
+
+model MonthlySnapshot {
+  id                        String   @id @default(uuid())
+  userId                    String
+  referenceMonth            String
+  totalIncomeExpected       Int      @default(0)
+  totalIncomeReceived       Int      @default(0)
+  totalExpensesExpected     Int      @default(0)
+  totalExpensesPaid         Int      @default(0)
+  netResult                 Int      @default(0)
+  projectedResult           Int      @default(0)
+  essentialExpensesTotal    Int      @default(0)
+  superfluousExpensesTotal  Int      @default(0)
+  savingsRate               Float    @default(0.0)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  @@unique([userId, referenceMonth])
+}
