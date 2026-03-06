@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { addMonths } from "date-fns";
 
 export async function createTransaction(formData: FormData) {
     const type = formData.get("type") as string;
@@ -13,7 +14,9 @@ export async function createTransaction(formData: FormData) {
     const categoryId = formData.get("categoryId") as string;
     const nature = formData.get("nature") as string || "essential";
     const notes = formData.get("notes") as string || "";
-    const isPaid = formData.get("isPaid") === "true"; // Checkbox opcional: "Já está pago/recebido"
+    const isPaid = formData.get("isPaid") === "true";
+    const isInstallment = formData.get("isInstallment") === "true";
+    const installmentsCount = parseInt(formData.get("installmentsCount") as string || "1");
 
     const newCategoryName = formData.get("newCategoryName") as string;
     const newSourceName = formData.get("newSourceName") as string;
@@ -84,32 +87,85 @@ export async function createTransaction(formData: FormData) {
         const catId = finalCatId || (await prisma.expenseCategory.findFirst({ where: { userId: user.id } }))?.id;
         if (!catId) return { error: "Sem categoria para apontar" };
 
-        const currentStatus = isPaid ? "paid" : "pending";
-
-        const expense = await prisma.expense.create({
-            data: {
-                userId: user.id,
-                accountId: accountId,
-                categoryId: catId,
-                title,
-                amount: amountCentavos,
-                paidAmount: isPaid ? amountCentavos : 0,
-                paymentMethod: "pix",
-                nature: nature,
-                status: currentStatus,
-                purchaseDate: new Date(),
-                dueDate,
-                paidDate: isPaid ? new Date() : null,
-                competencyDate,
-                notes,
-            }
-        });
-
-        if (isPaid) {
-            await prisma.account.update({
-                where: { id: accountId },
-                data: { currentBalance: { decrement: amountCentavos } }
+        if (isInstallment && installmentsCount > 1) {
+            // Lógica de Parcelamento
+            const group = await prisma.installmentGroup.create({
+                data: {
+                    userId: user.id,
+                    title,
+                    totalAmount: amountCentavos * installmentsCount,
+                    totalInstallments: installmentsCount,
+                    firstDueDate: dueDate,
+                    accountId,
+                }
             });
+
+            for (let i = 1; i <= installmentsCount; i++) {
+                const currentDueDate = addMonths(dueDate, i - 1);
+                const currentCompetency = new Date(currentDueDate.getFullYear(), currentDueDate.getMonth(), 1);
+
+                // Apenas a primeira parcela pode ser marcada como paga no ato da criação se isPaid for true
+                const currentIsPaid = i === 1 && isPaid;
+                const currentStatus = currentIsPaid ? "paid" : "pending";
+
+                await prisma.expense.create({
+                    data: {
+                        userId: user.id,
+                        accountId: accountId,
+                        categoryId: catId,
+                        title: `${title} (${i}/${installmentsCount})`,
+                        amount: amountCentavos,
+                        paidAmount: currentIsPaid ? amountCentavos : 0,
+                        paymentMethod: "credit_card",
+                        nature: nature,
+                        status: currentStatus,
+                        purchaseDate: new Date(),
+                        dueDate: currentDueDate,
+                        paidDate: currentIsPaid ? new Date() : null,
+                        competencyDate: currentCompetency,
+                        notes,
+                        isInstallment: true,
+                        installmentGroupId: group.id,
+                        installmentNumber: i,
+                        totalInstallments: installmentsCount,
+                    }
+                });
+
+                if (currentIsPaid) {
+                    await prisma.account.update({
+                        where: { id: accountId },
+                        data: { currentBalance: { decrement: amountCentavos } }
+                    });
+                }
+            }
+        } else {
+            const currentStatus = isPaid ? "paid" : "pending";
+
+            await prisma.expense.create({
+                data: {
+                    userId: user.id,
+                    accountId: accountId,
+                    categoryId: catId,
+                    title,
+                    amount: amountCentavos,
+                    paidAmount: isPaid ? amountCentavos : 0,
+                    paymentMethod: "pix",
+                    nature: nature,
+                    status: currentStatus,
+                    purchaseDate: new Date(),
+                    dueDate,
+                    paidDate: isPaid ? new Date() : null,
+                    competencyDate,
+                    notes,
+                }
+            });
+
+            if (isPaid) {
+                await prisma.account.update({
+                    where: { id: accountId },
+                    data: { currentBalance: { decrement: amountCentavos } }
+                });
+            }
         }
     }
 

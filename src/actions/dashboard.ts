@@ -3,7 +3,7 @@
 import prisma from "@/lib/prisma";
 import { startOfMonth, endOfMonth } from "date-fns";
 
-export async function getDashboardData() {
+export async function getDashboardData(year?: number, month?: number) {
     // 1. Setup Básico (Se o db estiver zerado, cria usuário local MOCK)
     let user = await prisma.user.findFirst();
     let defaultAccount;
@@ -47,10 +47,13 @@ export async function getDashboardData() {
         defaultAccount = await prisma.account.findFirst({ where: { userId: user.id } });
     }
 
-    // 2. Cálculos Reais do Dashboard para o mês atual
-    const now = new Date();
-    const firstDay = startOfMonth(now);
-    const lastDay = endOfMonth(now);
+    // 2. Cálculos Reais do Dashboard para o mês solicitado ou atual
+    let baseDate = new Date();
+    if (year !== undefined && month !== undefined) {
+        baseDate = new Date(year, month);
+    }
+    const firstDay = startOfMonth(baseDate);
+    const lastDay = endOfMonth(baseDate);
 
     // Receitas (Dentro do mes de competencia)
     const incomes = await prisma.income.findMany({
