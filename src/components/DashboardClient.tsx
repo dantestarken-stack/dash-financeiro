@@ -441,6 +441,7 @@ export default function DashboardClient({ data }: { data: any }) {
                         <>
                           <option value="Energia Elétrica" />
                           <option value="Aluguel" />
+                          <option value="Condomínio" />
                           <option value="Água" />
                           <option value="Internet / Celular" />
                           <option value="Mercado" />
