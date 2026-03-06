@@ -11,9 +11,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
 
 export default function DashboardClient({ data }: { data: any }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,12 +47,14 @@ export default function DashboardClient({ data }: { data: any }) {
     if (!confirm("Certeza que deseja apagar este lançamento?")) return;
     setDeletingId(id);
     await deleteTransaction(id, type);
+    router.refresh();
     setDeletingId(null);
   }
 
   async function handleMarkPaid(id: string, type: "income" | "expense") {
     setPayingId(id);
     await markTransactionAsPaid(id, type);
+    router.refresh();
     setPayingId(null);
   }
 
@@ -93,6 +97,7 @@ export default function DashboardClient({ data }: { data: any }) {
 
     await createTransaction(formData);
 
+    router.refresh();
     setIsSubmitting(false);
     setIsModalOpen(false);
   }
@@ -396,7 +401,14 @@ export default function DashboardClient({ data }: { data: any }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="group">
                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Valor (R$)</label>
-                    <input required name="amount" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all font-bold" />
+                    <input
+                      required
+                      name="amount"
+                      defaultValue={isCommission ? computedAmount : ""}
+                      key={isCommission ? "comm-" + computedAmount : "manual"}
+                      placeholder="0,00"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all font-bold"
+                    />
                   </div>
                   <div className="group">
                     <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Vencimento</label>
@@ -424,6 +436,11 @@ export default function DashboardClient({ data }: { data: any }) {
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Notas / Cliente</label>
                   <textarea name="notes" rows={2} placeholder="Identifique o cliente ou projeto..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm" />
+                </div>
+
+                <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <input type="checkbox" name="isPaid" value="true" id="isPaid" className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" />
+                  <label htmlFor="isPaid" className="text-sm font-bold text-slate-300">Marcar como {txType === 'income' ? 'Recebido' : 'Pago'} agora</label>
                 </div>
               </div>
 

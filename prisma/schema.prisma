@@ -7,95 +7,81 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// -----------------------------------------------------------------------------
-// USER & PROFILE
-// -----------------------------------------------------------------------------
-
 model User {
-  id                  String       @id @default(uuid())
+  id                  String             @id @default(uuid())
   name                String
-  email               String       @unique
+  email               String             @unique
   passwordHash        String
-  isActive            Boolean      @default(true)
-  onboardingCompleted Boolean      @default(false)
+  isActive            Boolean            @default(true)
+  onboardingCompleted Boolean            @default(false)
   lastLoginAt         DateTime?
-  
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-
-  profile             UserProfile?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
   accounts            Account[]
-  cards               Card[]
-  incomeSources       IncomeSource[]
-  expenseCategories   ExpenseCategory[]
-  incomes             Income[]
-  expenses            Expense[]
-  recurringRules      RecurringRule[]
-  installmentGroups   InstallmentGroup[]
-  goals               Goal[]
-  assets              Asset[]
-  liabilities         Liability[]
   alerts              Alert[]
+  assets              Asset[]
+  cards               Card[]
+  expenses            Expense[]
+  expenseCategories   ExpenseCategory[]
+  goals               Goal[]
+  incomes             Income[]
+  incomeSources       IncomeSource[]
+  installmentGroups   InstallmentGroup[]
+  liabilities         Liability[]
+  recurringRules      RecurringRule[]
   tags                Tag[]
+  profile             UserProfile?
 }
 
 model UserProfile {
-  id                     String   @id @default(uuid())
-  userId                 String   @unique
-  monthlyFixedIncome     Int      @default(0)
-  usesCommissionIncome   Boolean  @default(false)
-  preferredCurrency      String   @default("BRL")
-  timezone               String   @default("America/Sao_Paulo")
-  locale                 String   @default("pt-BR")
-  savingsGoalPercentage  Int      @default(0)
-  financialPriority      String?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  monthlyFixedIncome    Int      @default(0)
+  usesCommissionIncome  Boolean  @default(false)
+  preferredCurrency     String   @default("BRL")
+  timezone              String   @default("America/Sao_Paulo")
+  locale                String   @default("pt-BR")
+  savingsGoalPercentage Int      @default(0)
+  financialPriority     String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// -----------------------------------------------------------------------------
-// BANKING & CARDS
-// -----------------------------------------------------------------------------
-
 model Account {
-  id             String    @id @default(uuid())
-  userId         String
-  name           String
-  type           String
+  id              String    @id @default(uuid())
+  userId          String
+  name            String
+  type            String
   institutionName String?
-  currentBalance Int       @default(0)
-  initialBalance Int       @default(0)
-  color          String?
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cards          Card[]
-  incomes        Income[]
-  expenses       Expense[]
+  currentBalance  Int       @default(0)
+  initialBalance  Int       @default(0)
+  color           String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards           Card[]
+  expenses        Expense[]
+  incomes         Income[]
 }
 
 model Card {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   userId      String
   accountId   String?
   name        String
   brand       String?
-  limitAmount Int      @default(0)
+  limitAmount Int       @default(0)
   closingDay  Int
   dueDay      Int
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account     Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  account     Account?  @relation(fields: [accountId], references: [id])
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expenses    Expense[]
 }
-
-// -----------------------------------------------------------------------------
-// TAXONOMY
-// -----------------------------------------------------------------------------
 
 model IncomeSource {
   id        String   @id @default(uuid())
@@ -105,89 +91,86 @@ model IncomeSource {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   incomes   Income[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ExpenseCategory {
-  id            String              @id @default(uuid())
+  id            String               @id @default(uuid())
   userId        String
   name          String
   icon          String?
   color         String?
-  isDefault     Boolean             @default(false)
-  isActive      Boolean             @default(true)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subcategories ExpenseSubcategory[]
+  isDefault     Boolean              @default(false)
+  isActive      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
   expenses      Expense[]
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subcategories ExpenseSubcategory[]
 }
 
 model ExpenseSubcategory {
-  id          String          @id @default(uuid())
-  categoryId  String
-  userId      String
-  name        String
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  category    ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  expenses    Expense[]
+  id         String          @id @default(uuid())
+  categoryId String
+  userId     String
+  name       String
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  expenses   Expense[]
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 }
 
 model Tag {
-  id        String   @id @default(uuid())
+  id        String           @id @default(uuid())
   userId    String
   name      String
   color     String?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   txnTags   TransactionTag[]
 }
 
 model TransactionTag {
-  id                  String   @id @default(uuid())
-  tagId               String
-  relatedEntityType   String
-  relatedEntityId     String
-  createdAt           DateTime @default(now())
-  tag                 Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  id                String   @id @default(uuid())
+  tagId             String
+  relatedEntityType String
+  relatedEntityId   String
+  createdAt         DateTime @default(now())
+  tag               Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
   @@unique([tagId, relatedEntityType, relatedEntityId])
 }
 
-// -----------------------------------------------------------------------------
-// TRANSACTIONS
-// -----------------------------------------------------------------------------
-
 model Income {
-  id               String   @id @default(uuid())
-  userId           String
-  accountId        String
-  incomeSourceId   String
-  title            String
-  description      String?
-  expectedAmount   Int
-  receivedAmount   Int      @default(0)
-  type             String
-  status           String
-  dueDate          DateTime
-  receivedDate     DateTime?
-  competencyDate   DateTime
-  isRecurring      Boolean  @default(false)
-  recurringRuleId  String?
-  notes            String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  deletedAt        DateTime?
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account          Account        @relation(fields: [accountId], references: [id])
-  incomeSource     IncomeSource   @relation(fields: [incomeSourceId], references: [id])
-  recurringRule    RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+  id              String         @id @default(uuid())
+  userId          String
+  accountId       String
+  incomeSourceId  String
+  title           String
+  description     String?
+  expectedAmount  Int
+  receivedAmount  Int            @default(0)
+  type            String
+  status          String
+  dueDate         DateTime
+  receivedDate    DateTime?
+  competencyDate  DateTime
+  isRecurring     Boolean        @default(false)
+  recurringRuleId String?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+  account         Account        @relation(fields: [accountId], references: [id])
+  incomeSource    IncomeSource   @relation(fields: [incomeSourceId], references: [id])
+  recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id])
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Expense {
-  id                 String   @id @default(uuid())
+  id                 String              @id @default(uuid())
   userId             String
   accountId          String?
   cardId             String?
@@ -196,7 +179,7 @@ model Expense {
   title              String
   description        String?
   amount             Int
-  paidAmount         Int      @default(0)
+  paidAmount         Int                 @default(0)
   paymentMethod      String
   nature             String
   status             String
@@ -205,35 +188,31 @@ model Expense {
   paidDate           DateTime?
   competencyDate     DateTime
   merchantName       String?
-  isRecurring        Boolean  @default(false)
+  isRecurring        Boolean             @default(false)
   recurringRuleId    String?
-  isInstallment      Boolean  @default(false)
+  isInstallment      Boolean             @default(false)
   installmentGroupId String?
   installmentNumber  Int?
   totalInstallments  Int?
   notes              String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   deletedAt          DateTime?
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   account            Account?            @relation(fields: [accountId], references: [id])
   card               Card?               @relation(fields: [cardId], references: [id])
   category           ExpenseCategory     @relation(fields: [categoryId], references: [id])
-  subcategory        ExpenseSubcategory? @relation(fields: [subcategoryId], references: [id])
-  recurringRule      RecurringRule?      @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
   installmentGroup   InstallmentGroup?   @relation(fields: [installmentGroupId], references: [id], onDelete: Cascade)
+  recurringRule      RecurringRule?      @relation(fields: [recurringRuleId], references: [id])
+  subcategory        ExpenseSubcategory? @relation(fields: [subcategoryId], references: [id])
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// -----------------------------------------------------------------------------
-// AGENTS
-// -----------------------------------------------------------------------------
-
 model RecurringRule {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   userId            String
   entityType        String
   frequency         String
-  intervalValue     Int      @default(1)
+  intervalValue     Int       @default(1)
   startDate         DateTime
   endDate           DateTime?
   nextRunDate       DateTime
@@ -241,13 +220,13 @@ model RecurringRule {
   lastGeneratedAt   DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  incomes           Income[]
   expenses          Expense[]
+  incomes           Income[]
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model InstallmentGroup {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   userId            String
   title             String
   totalAmount       Int
@@ -255,32 +234,28 @@ model InstallmentGroup {
   firstDueDate      DateTime
   accountId         String?
   cardId            String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   expenses          Expense[]
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// -----------------------------------------------------------------------------
-// WEALTH
-// -----------------------------------------------------------------------------
-
 model Goal {
-  id                 String   @id @default(uuid())
-  userId             String
-  title              String
-  description        String?
-  type               String
-  targetAmount       Int
-  currentAmount      Int      @default(0)
+  id                  String   @id @default(uuid())
+  userId              String
+  title               String
+  description         String?
+  type                String
+  targetAmount        Int
+  currentAmount       Int      @default(0)
   monthlyTargetAmount Int?
-  startDate          DateTime
-  targetDate         DateTime
-  status             String
-  priority           Int      @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate           DateTime
+  targetDate          DateTime
+  status              String
+  priority            Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Asset {
@@ -297,7 +272,7 @@ model Asset {
 }
 
 model Liability {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   userId            String
   name              String
   type              String
@@ -307,14 +282,10 @@ model Liability {
   interestRate      Float?
   dueDate           DateTime?
   notes             String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
-// -----------------------------------------------------------------------------
-// SYSTEM
-// -----------------------------------------------------------------------------
 
 model Alert {
   id                String   @id @default(uuid())
@@ -344,19 +315,20 @@ model Attachment {
 }
 
 model MonthlySnapshot {
-  id                        String   @id @default(uuid())
-  userId                    String
-  referenceMonth            String
-  totalIncomeExpected       Int      @default(0)
-  totalIncomeReceived       Int      @default(0)
-  totalExpensesExpected     Int      @default(0)
-  totalExpensesPaid         Int      @default(0)
-  netResult                 Int      @default(0)
-  projectedResult           Int      @default(0)
-  essentialExpensesTotal    Int      @default(0)
-  superfluousExpensesTotal  Int      @default(0)
-  savingsRate               Float    @default(0.0)
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                       String   @id @default(uuid())
+  userId                   String
+  referenceMonth           String
+  totalIncomeExpected      Int      @default(0)
+  totalIncomeReceived      Int      @default(0)
+  totalExpensesExpected    Int      @default(0)
+  totalExpensesPaid        Int      @default(0)
+  netResult                Int      @default(0)
+  projectedResult          Int      @default(0)
+  essentialExpensesTotal   Int      @default(0)
+  superfluousExpensesTotal Int      @default(0)
+  savingsRate              Float    @default(0.0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
   @@unique([userId, referenceMonth])
 }
