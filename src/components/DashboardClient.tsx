@@ -2,28 +2,6 @@
 
 import React, { useState } from "react";
 import {
-  LayoutDashboard,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  CalendarDays,
-  Activity,
-  Target,
-  PieChart,
-  Settings,
-  Bell,
-  Search,
-  Plus,
-  ChevronDown,
-  AlertCircle,
-  TrendingDown,
-  TrendingUp,
-  CreditCard,
-  Building2,
-  X,
-  Trash2,
-  Calculator,
-} from "lucide-react";
-import {
   AreaChart,
   Area,
   XAxis,
@@ -72,19 +50,17 @@ export default function DashboardClient({ data }: { data: any }) {
     setPayingId(null);
   }
 
-  // Calculo simplório para a variação da tabela chartMock baseada em real, mas num MVP 1 a gente pode usar fixo se o BD tiver vazio.
   const chartData = [
-    { day: "Proj. Saldo Anterior", actual: 0, projected: 0 },
-    { day: "Saldo Atual", actual: kpis.accountBalance, projected: kpis.accountBalance },
-    { day: "Final Prox Semana", actual: null, projected: kpis.accountBalance + (kpis.remainingIncome / 2) - (kpis.pendingExpense / 2) },
-    { day: "Final do Mês", actual: null, projected: kpis.projectedBalance },
+    { day: "01 OUT", actual: kpis.accountBalance * 0.8, projected: kpis.accountBalance * 0.8 },
+    { day: "HOJE", actual: kpis.accountBalance, projected: kpis.accountBalance },
+    { day: "31 OUT", actual: null, projected: kpis.projectedBalance },
   ];
 
   async function handleSubmit(e: any) {
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.target);
-    formData.append("accountId", defaultAccountId); // Passa a conta corrente default
+    formData.append("accountId", defaultAccountId);
 
     await createTransaction(formData);
 
@@ -93,42 +69,42 @@ export default function DashboardClient({ data }: { data: any }) {
   }
 
   const totalSpentAndPending = kpis.paidExpense + kpis.pendingExpense;
-  const essentialPct = totalSpentAndPending ? (spentByNature.essential / totalSpentAndPending) * 100 : 0;
-  const importantPct = totalSpentAndPending ? (spentByNature.important / totalSpentAndPending) * 100 : 0;
-  const superfluousPct = totalSpentAndPending ? (spentByNature.superfluous / totalSpentAndPending) * 100 : 0;
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-slate-950 text-slate-300 flex flex-col hidden md:flex">
-        <div className="h-16 flex items-center px-6 border-b border-slate-800">
-          <Activity className="w-6 h-6 text-blue-500 mr-2" />
-          <span className="font-bold text-lg tracking-tight text-white">
-            Command Center
-          </span>
+    <div className="flex h-screen bg-mesh text-slate-100 font-sans selection:bg-primary/30 overflow-hidden">
+      {/* SIDEBAR (Desktop) */}
+      <aside className="w-20 lg:w-64 bg-slate-900/40 backdrop-blur-xl border-r border-white/5 flex flex-col hidden md:flex shrink-0">
+        <div className="h-20 flex items-center px-6 gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+            <span className="material-symbols-outlined text-2xl">account_balance_wallet</span>
+          </div>
+          <div className="hidden lg:block truncate">
+            <h1 className="text-sm font-bold leading-tight">Financial Command</h1>
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Intelligence Pro</p>
+          </div>
         </div>
 
-        <nav className="flex-1 py-6 px-3 space-y-1">
+        <nav className="flex-1 py-6 px-4 space-y-2">
           <NavItem
-            icon={<LayoutDashboard />}
-            label="Dashboard"
+            icon="dashboard"
+            label="Painel"
             active={activeTab === "dashboard"}
             onClick={() => setActiveTab("dashboard")}
           />
           <NavItem
-            icon={<ArrowDownToLine />}
+            icon="payments"
             label="Receitas"
             active={activeTab === "incomes"}
             onClick={() => setActiveTab("incomes")}
           />
           <NavItem
-            icon={<ArrowUpFromLine />}
+            icon="receipt_long"
             label="Despesas"
             active={activeTab === "expenses"}
             onClick={() => setActiveTab("expenses")}
           />
           <NavItem
-            icon={<CalendarDays />}
+            icon="calendar_month"
             label="Agenda"
             badge={recentTransactions.filter((r: any) => r.status === 'pending').length.toString()}
             active={activeTab === "agenda"}
@@ -138,284 +114,184 @@ export default function DashboardClient({ data }: { data: any }) {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
+      <main className="flex-1 flex flex-col overflow-hidden">
         {/* HEADER BAR */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10 w-full shrink-0">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center bg-slate-100 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-slate-200">
-              <span className="text-sm font-medium mr-2">Mês Atual</span>
-              <ChevronDown className="w-4 h-4 text-slate-500" />
-            </div>
+        <header className="h-20 border-b border-white/5 flex items-center justify-between px-6 lg:px-10 z-10 w-full shrink-0 bg-slate-900/20 backdrop-blur-md">
+          <div className="flex items-center gap-4">
+            <button className="flex items-center gap-2 bg-white/5 hover:bg-white/10 transition-colors px-3 py-1.5 rounded-lg border border-white/10">
+              <span className="material-symbols-outlined text-primary text-sm">calendar_month</span>
+              <span className="text-xs font-semibold uppercase tracking-wide">Outubro 2024</span>
+              <span className="material-symbols-outlined text-slate-500 text-sm">expand_more</span>
+            </button>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-4">
+            <div className="relative hidden sm:block">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
+              <input className="pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm w-48 lg:w-64 focus:ring-2 focus:ring-primary h-10 outline-none transition-all" placeholder="Buscar transação..." type="text" />
+            </div>
             <button
               onClick={() => setIsModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center shadow-sm transition-all"
+              className="bg-primary hover:bg-primary/90 text-white h-10 px-4 rounded-xl text-sm font-bold flex items-center shadow-lg shadow-primary/20 transition-all active:scale-95"
             >
-              <Plus className="w-4 h-4 mr-1.5" /> Lançamento
+              <span className="material-symbols-outlined mr-2">add</span> Lançamento
             </button>
           </div>
         </header>
 
-        {/* DASHBOARD SCROLL AREA */}
-        <div className="flex-1 overflow-auto p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto space-y-8">
+        {/* SCROLL AREA */}
+        <div className="flex-1 overflow-auto p-6 lg:p-10 pb-32">
+          <div className="max-w-7xl mx-auto space-y-10">
             {activeTab === "dashboard" && (
               <>
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                  <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                      Bem-vindo, {data.user?.name || "Líder"}!
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">
-                      Estes são os dados consolidados da sua base local SQLite.
-                    </p>
-                  </div>
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-3xl font-black text-white tracking-tight">
+                    Olá, {data.user?.name || "Comandante"}
+                  </h2>
+                  <p className="text-slate-400 text-sm font-medium">Sua inteligência local SQLite está atualizada.</p>
                 </div>
 
-                {/* FAIXA 1: KPIs (Dados Vivos) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* KPI TILES */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <KpiCard
-                    title="Saldo em Conta"
+                    title="Saldo Atual"
                     value={`R$ ${kpis.accountBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                    trend="Base atual"
+                    trend="+2.4%"
                     trendUp={true}
-                    icon={<Building2 className="w-5 h-5 text-blue-500" />}
-                    color="blue"
+                    icon="account_balance"
+                    color="primary"
                   />
                   <KpiCard
-                    title="Receita Consolidada (Confirmada)"
+                    title="Receita Confirmada"
                     value={`R$ ${kpis.actualIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                    trend={`Falta receber R$ ${kpis.remainingIncome}`}
+                    trend={`Falta R$ ${kpis.remainingIncome}`}
                     trendUp={true}
-                    icon={<ArrowDownToLine className="w-5 h-5 text-emerald-500" />}
-                    color="green"
+                    icon="trending_up"
+                    color="success"
                   />
                   <KpiCard
-                    title="Despesa Efetiva (Paga)"
+                    title="Despesa Efetiva"
                     value={`R$ ${kpis.paidExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                    trend={`Pendente/Avencer R$ ${kpis.pendingExpense}`}
+                    trend={`Pendente R$ ${kpis.pendingExpense}`}
                     trendUp={false}
-                    icon={<ArrowUpFromLine className="w-5 h-5 text-rose-500" />}
-                    color="red"
+                    icon="payments"
+                    color="danger"
                   />
                   <KpiCard
-                    title="Saldo Projetado (Futuro)"
+                    title="Saldo Projetado"
                     value={`R$ ${kpis.projectedBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                    trend="Se tudo ocorrer como previsto."
-                    trendUp={kpis.projectedBalance >= 0}
-                    icon={kpis.projectedBalance >= 0 ? <TrendingUp className="w-5 h-5 text-amber-500" /> : <TrendingDown className="w-5 h-5 text-rose-500" />}
-                    color="amber"
+                    trend="Projeção final"
+                    icon="query_stats"
+                    color="warning"
                   />
                 </div>
 
+                {/* COMMISSION BANNER */}
                 {kpis.pendingCommissions > 0 && (
-                  <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 to-slate-900 border border-primary/20 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all hover:border-primary/40 shadow-2xl">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 blur-[100px] -z-10 group-hover:bg-primary/30 transition-colors"></div>
                     <div>
-                      <h2 className="text-xl font-bold flex items-center">
-                        <Target className="w-6 h-6 mr-2" />
-                        Comissões a Receber do Mês
+                      <h2 className="text-2xl font-black text-white flex items-center tracking-tight">
+                        <span className="material-symbols-outlined text-primary text-3xl mr-3">target</span>
+                        Comissões no Radar
                       </h2>
-                      <p className="opacity-90 text-sm mt-1">Lembre-se de cobrar ou acompanhar estes valores para bater sua meta!</p>
+                      <p className="text-slate-400 text-sm mt-2 max-w-md font-medium">Você tem valores significativos para liquidar este mês. Mantenha o foco na execução.</p>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xs font-bold uppercase tracking-wider opacity-70">Total Pendente</span>
-                      <div className="text-4xl font-black">R$ {kpis.pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl px-8 py-4 backdrop-blur-md">
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Total em Aberto</span>
+                      <div className="text-4xl font-black text-white mt-1">
+                        R$ {kpis.pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* FAIXA 2: Gráfico e Agenda */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* O Fluxo Futuro */}
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 lg:col-span-2">
-                    <div className="flex justify-between items-center mb-6">
-                      <div>
-                        <h2 className="text-lg font-bold text-slate-800">Trajetória do Caixa (Mês)</h2>
-                      </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* CHART */}
+                  <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-8 shadow-xl">
+                    <div className="flex justify-between items-center mb-10">
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary">distance</span>
+                        Trajetória de Caixa
+                      </h3>
                     </div>
-                    <div className="h-[250px] w-full">
+                    <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                          <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 12 }} dy={10} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 12 }} tickFormatter={(val) => `R$ ${val}`} />
-                          <Tooltip />
-                          <Area type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={3} fill="#3b82f6" fillOpacity={0.2} connectNulls />
-                          <Area type="monotone" dataKey="projected" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" fill="none" />
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#135bec" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#135bec" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                          <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }} dy={15} />
+                          <YAxis hide />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }}
+                            itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                          />
+                          <Area type="monotone" dataKey="actual" stroke="#135bec" strokeWidth={4} fillOpacity={1} fill="url(#colorActual)" connectNulls />
+                          <Area type="monotone" dataKey="projected" stroke="rgba(255,255,255,0.2)" strokeWidth={2} strokeDasharray="8 8" fill="none" />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
 
-                  {/* Agenda Financeira Rápida */}
-                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col">
-                    <h2 className="text-lg font-bold text-slate-800 mb-6">Relatório de Transações</h2>
-                    <div className="flex-1 overflow-auto pr-2 space-y-4">
+                  {/* RECENT ACTIONS / WIDGET */}
+                  <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-8 flex flex-col shadow-xl">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 mb-8">Movimentações</h3>
+                    <div className="flex-1 space-y-4">
                       {recentTransactions.length === 0 ? (
-                        <div className="text-sm text-slate-400 text-center mt-10">
-                          Nenhuma transação cadastrada. Use o botão +Lançamento para testar o banco!
-                        </div>
+                        <div className="text-sm text-slate-500 text-center py-20 italic">Centro sem comando.</div>
                       ) : recentTransactions.map((t: any) => (
-                        <div key={t.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 border border-slate-100 group">
-                          <div className="flex items-center">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${t.type === "income" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-                              }`}>
-                              {t.type === "income" ? <ArrowDownToLine className="w-4 h-4" /> : <ArrowUpFromLine className="w-4 h-4" />}
+                        <div key={t.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${t.type === 'income' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                              <span className="material-symbols-outlined text-xl">{t.type === 'income' ? 'add' : 'remove'}</span>
                             </div>
-                            <div>
-                              <p className="font-semibold text-sm text-slate-800">{t.name}</p>
-                              <span className={`px-1.5 py-[1px] rounded font-medium text-[10px] uppercase tracking-wider ${t.status === "received" || t.status === "paid" ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-700"
-                                }`}>{t.status === "expected" || t.status === "pending" ? "A vencer/esperado" : t.status === "received" || t.status === "paid" ? "Baixado" : t.status} • {t.date}</span>
+                            <div className="max-w-[120px]">
+                              <p className="text-sm font-bold text-white truncate">{t.name}</p>
+                              <p className="text-[10px] text-slate-500 font-bold uppercase">{t.displayDate}</p>
                             </div>
                           </div>
-                          <div className={`font-semibold text-sm tracking-tight ${t.type === "income" ? "text-emerald-600" : "text-rose-600"
-                            }`}>
-                            {t.type === "income" ? "+" : "-"} R$ {Math.abs(t.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                          </div>
+                          <p className={`text-sm font-black ${t.type === 'income' ? 'text-success' : 'text-white'}`}>
+                            {t.type === 'income' ? '+' : '-'} {Math.abs(t.amount).toLocaleString('pt-BR')}
+                          </p>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
-
-                {/* FAIXA 3: Análise de Custos e Supérfluos */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-8 w-full">
-                  <div className="flex justify-between items-center mb-5">
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-800">Eficiência de Controle (Despesas Totais: R$ {totalSpentAndPending.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})</h2>
-                      <p className="text-slate-500 text-sm">Visualize para onde está indo o seu dinheiro na proporção geral.</p>
-                    </div>
-                  </div>
-
-                  {totalSpentAndPending === 0 ? (
-                    <div className="text-sm text-slate-400 py-6 text-center">Nenhuma despesa para análise ainda.</div>
-                  ) : (
-                    <div className="space-y-6">
-                      {/* Barra Visual */}
-                      <div className="w-full flex h-4 rounded-full overflow-hidden">
-                        <div style={{ width: `${essentialPct}%` }} className="bg-emerald-500 hover:opacity-90 transition-opacity" title="Fixos / Essenciais"></div>
-                        <div style={{ width: `${importantPct}%` }} className="bg-amber-500 hover:opacity-90 transition-opacity" title="Variáveis / Importantes"></div>
-                        <div style={{ width: `${superfluousPct}%` }} className="bg-rose-500 hover:opacity-90 transition-opacity" title="Supérfluos"></div>
-                      </div>
-
-                      {/* Legendas Embaixo */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mt-4">
-                        <div className="bg-emerald-50/50 p-3 rounded border border-emerald-100/50 flex flex-col justify-center">
-                          <div className="flex items-center text-slate-700 font-semibold mb-1">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span> Essenciais / Fixos
-                          </div>
-                          <span className="font-bold text-lg text-emerald-700">R$ {spentByNature.essential.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} <span className="text-sm font-medium opacity-70 ml-1">({essentialPct.toFixed(0)}%)</span></span>
-                          <span className="text-xs text-slate-500 mt-1 line-clamp-1">Moradia, mercado base, saúde, luz</span>
-                        </div>
-
-                        <div className="bg-amber-50/50 p-3 rounded border border-amber-100/50 flex flex-col justify-center">
-                          <div className="flex items-center text-slate-700 font-semibold mb-1">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2"></span> Importantes / Variáveis
-                          </div>
-                          <span className="font-bold text-lg text-amber-700">R$ {spentByNature.important.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} <span className="text-sm font-medium opacity-70 ml-1">({importantPct.toFixed(0)}%)</span></span>
-                          <span className="text-xs text-slate-500 mt-1 line-clamp-1">Educação, roupas necessárias, bem-estar</span>
-                        </div>
-
-                        <div className="bg-rose-50/50 p-3 rounded border border-rose-100/50 flex flex-col justify-center">
-                          <div className="flex items-center text-slate-700 font-semibold mb-1">
-                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 mr-2"></span> Supérfluos (Vazamento)
-                          </div>
-                          <span className="font-bold text-lg text-rose-700">R$ {spentByNature.superfluous.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} <span className="text-sm font-medium opacity-70 ml-1">({superfluousPct.toFixed(0)}%)</span></span>
-                          <span className="text-xs text-slate-500 mt-1 line-clamp-1">Ifood em excesso, impulsos, vícios</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
               </>
             )}
 
-            {activeTab === "incomes" && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Gestão de Receitas</h1>
-                  <p className="text-slate-500 text-sm mt-1">Acompanhe suas entradas previstas e realizadas.</p>
-                </div>
-                <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Total A Receber (Previsto)</span>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-amber-500">R$ {kpis.remainingIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
-                  </div>
-                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Total Recebido (Efetivo)</span>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-emerald-500">R$ {kpis.actualIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
-                  </div>
-                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Soma Total (Mês)</span>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">R$ {(kpis.remainingIncome + kpis.actualIncome).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
-                  </div>
-                </section>
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-hidden">
-                  <h3 className="font-bold text-lg mb-4">Lançamentos de Receita</h3>
-                  <div className="space-y-4">
-                    {allTransactions.filter((t: any) => t.type === "income").length === 0 ? (
-                      <div className="text-sm text-slate-400 text-center py-10">Nenhuma receita lançada.</div>
-                    ) : allTransactions.filter((t: any) => t.type === "income").map((t: any) => (
-                      <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "expenses" && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Gestão de Despesas</h1>
-                  <p className="text-slate-500 text-sm mt-1">Controle seus custos e avalie seu nível de gastos.</p>
-                </div>
-                <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Agendado (A Pagar)</span>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-amber-500">R$ {kpis.pendingExpense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
-                  </div>
-                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Liquidado (Pago)</span>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-rose-500">R$ {kpis.paidExpense.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
-                  </div>
-                  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Custos Totais (Mês)</span>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">R$ {(kpis.pendingExpense + kpis.paidExpense).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</h3>
-                  </div>
-                </section>
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-hidden">
-                  <h3 className="font-bold text-lg mb-4">Lançamentos de Despesa</h3>
-                  <div className="space-y-4">
-                    {allTransactions.filter((t: any) => t.type === "expense").length === 0 ? (
-                      <div className="text-sm text-slate-400 text-center py-10">Nenhuma despesa lançada.</div>
-                    ) : allTransactions.filter((t: any) => t.type === "expense").map((t: any) => (
-                      <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "agenda" && (
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                  <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Agenda Financeira</h1>
-                    <p className="text-slate-500 text-sm mt-1">Gerencie compromissos a pagar e valores a receber.</p>
-                  </div>
+            {(activeTab === "incomes" || activeTab === "expenses" || activeTab === "agenda") && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-black text-white uppercase tracking-tight">
+                    {activeTab === "incomes" ? "Portfólio de Receitas" : activeTab === "expenses" ? "Centro de Despesas" : "Agenda de Compromissos"}
+                  </h2>
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-hidden">
-                  <div className="space-y-4">
-                    {allTransactions.length === 0 ? (
-                      <div className="text-sm text-slate-400 text-center py-10">
-                        Sua agenda está vazia para este mês.
-                      </div>
-                    ) : allTransactions.map((t: any) => (
-                      <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
-                    ))}
+                <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
+                  <div className="p-8 space-y-4">
+                    {allTransactions.filter((t: any) =>
+                      activeTab === "agenda" ? true : t.type === (activeTab === "incomes" ? "income" : "expense")
+                    ).length === 0 ? (
+                      <div className="py-20 text-center text-slate-500 font-medium">Nenhum registro tático encontrado.</div>
+                    ) : allTransactions
+                      .filter((t: any) => activeTab === "agenda" ? true : t.type === (activeTab === "incomes" ? "income" : "expense"))
+                      .map((t: any) => (
+                        <TransactionRow
+                          key={t.id}
+                          t={t}
+                          payingId={payingId}
+                          deletingId={deletingId}
+                          handleMarkPaid={handleMarkPaid}
+                          handleDelete={handleDelete}
+                        />
+                      ))}
                   </div>
                 </div>
               </div>
@@ -423,227 +299,155 @@ export default function DashboardClient({ data }: { data: any }) {
           </div>
         </div>
 
-        {/* MODAL DE NOVO LANÇAMENTO (OVERLAY) */}
-        {
-          isModalOpen && (
-            <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden relative">
-                <div className="flex items-center justify-between p-5 border-b border-slate-100">
-                  <h3 className="font-bold text-lg">Novo Lançamento</h3>
-                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700">
-                    <X className="w-5 h-5" />
-                  </button>
+        {/* BOTTOM NAV (MOBILE) */}
+        <nav className="md:hidden fixed bottom-6 left-6 right-6 h-16 bg-slate-900/80 backdrop-blur-2xl border border-white/10 rounded-2xl flex items-center justify-around px-2 z-[100] shadow-2xl shadow-black">
+          <MobileNavItem icon="dashboard" active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
+          <MobileNavItem icon="payments" active={activeTab === "incomes"} onClick={() => setActiveTab("incomes")} />
+          <MobileNavItem icon="receipt_long" active={activeTab === "expenses"} onClick={() => setActiveTab("expenses")} />
+          <MobileNavItem icon="calendar_month" active={activeTab === "agenda"} onClick={() => setActiveTab("agenda")} />
+        </nav>
+      </main>
+
+      {/* MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter">Novo Lançamento</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-0 space-y-6">
+              <div className="grid grid-cols-2 gap-2 bg-white/5 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setTxType("income")}
+                  className={`py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${txType === 'income' ? 'bg-primary text-white' : 'text-slate-500 hover:text-white'}`}
+                >
+                  Receita
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTxType("expense")}
+                  className={`py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${txType === 'expense' ? 'bg-primary text-white' : 'text-slate-500 hover:text-white'}`}
+                >
+                  Despesa
+                </button>
+              </div>
+              <input type="hidden" name="type" value={txType} />
+
+              <div className="space-y-4">
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Descrição</label>
+                  <input required name="title" list="suggestions" placeholder="Ex: Venda de Consultoria, Aluguel..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+                  <datalist id="suggestions">
+                    {txType === "expense" ? (
+                      <>
+                        <option value="Mercado" /> <option value="Gasolina" /> <option value="Aluguel" />
+                        <option value="Internet" /> <option value="Luz/Energia" /> <option value="Condomínio" />
+                      </>
+                    ) : (
+                      <>
+                        <option value="Salário" /> <option value="Comissão" /> <option value="Dividendos" /> <option value="Freelance" />
+                      </>
+                    )}
+                  </datalist>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-5 space-y-4">
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Movimentação</label>
-                      <select id="modal-type-select" name="type" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        value={txType}
-                        onChange={(e) => setTxType(e.target.value)}
-                      >
-                        <option value="expense">Despesa (A Pagar)</option>
-                        <option value="income">Receita (A Receber)</option>
-                      </select>
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="group">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Valor (R$)</label>
+                    <input required name="amount" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all font-bold" />
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                    <input name="title" required list="title-suggestions" type="text" placeholder="Ex: Conta de Luz, Salário..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                    <datalist id="title-suggestions">
-                      {txType === "expense" ? (
-                        <>
-                          <option value="Energia Elétrica" />
-                          <option value="Aluguel" />
-                          <option value="Condomínio" />
-                          <option value="Água" />
-                          <option value="Internet / Celular" />
-                          <option value="Mercado" />
-                          <option value="Ifood" />
-                          <option value="Combustível" />
-                          <option value="Streaming (Netflix/Spotify)" />
-                          <option value="Outros" />
-                        </>
-                      ) : (
-                        <>
-                          <option value="Salário Mensal" />
-                          <option value="Comissão" />
-                          <option value="Bonus" />
-                          <option value="Outros" />
-                        </>
-                      )}
-                    </datalist>
+                  <div className="group">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Vencimento</label>
+                    <input required name="dueDate" type="date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
                   </div>
+                </div>
 
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Valor {isCommission ? "Calculado" : "(R$)"}</label>
-                      {isCommission ? (
-                        <input name="amount" required type="text" readOnly value={computedAmount} className="w-full border border-blue-300 bg-blue-50/50 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 font-bold text-blue-800" />
-                      ) : (
-                        <input name="amount" required type="text" inputMode="decimal" placeholder="0,00 ou 3.000,00" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                      )}
+                {txType === "income" && (
+                  <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <input type="checkbox" id="isComm" checked={isCommission} onChange={(e) => setIsCommission(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" />
+                      <label htmlFor="isComm" className="text-sm font-bold text-slate-300">Cálculo de Comissão Automatizado</label>
                     </div>
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                      <input name="dueDate" required type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                    </div>
-                  </div>
-
-                  {txType === "income" && (
-                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                      <label className="flex items-center space-x-2 text-sm font-bold text-slate-700 cursor-pointer">
-                        <input type="checkbox" checked={isCommission} onChange={(e) => setIsCommission(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer" />
-                        <span>Calcular Comissão (Venda/Contrato)</span>
-                      </label>
-
-                      {isCommission && (
-                        <div className="mt-3 flex gap-4">
-                          <div className="flex-1">
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Valor da 1ª Parcela ou Contrato (R$)</label>
-                            <input type="text" value={contractValue} onChange={(e) => setContractValue(e.target.value)} placeholder="0,00" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" />
-                          </div>
-                          <div className="w-24">
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Sua %</label>
-                            <select value={commissionPct} onChange={(e) => setCommissionPct(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-                              <option value="10">10%</option>
-                              <option value="15">15%</option>
-                              <option value="20">20%</option>
-                              <option value="25">25%</option>
-                              <option value="30">30%</option>
-                              <option value="35">35%</option>
-                              <option value="40">40%</option>
-                              <option value="45">45%</option>
-                              <option value="50">50%</option>
-                            </select>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Notas / Nome do Cliente</label>
-                    <textarea name="notes" rows={2} placeholder="Ex: Cliente João Silva, Venda de Site..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white" />
-                  </div>
-
-                  {txType === "expense" && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Categoria da Despesa</label>
-                        <select name="categoryId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-                          onChange={(e) => setShowNewCategory(e.target.value === "NEW")}
-                        >
-                          {data.expenseCategories?.map((c: any) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                          <option value="NEW">+ Criar Nova Categoria...</option>
-                        </select>
-                        {showNewCategory && (
-                          <input name="newCategoryName" required type="text" placeholder="Nome da nova categoria" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Natureza do Gasto</label>
-                        <select name="nature" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
-                          <option value="essential">Custo Fixo / Essencial</option>
-                          <option value="important">Custo Variável / Importante</option>
-                          <option value="superfluous">Supérfluo</option>
+                    {isCommission && (
+                      <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
+                        <input placeholder="Valor Venda" value={contractValue} onChange={(e) => setContractValue(e.target.value)} className="bg-white/10 border-none rounded-lg p-2 text-xs text-white" />
+                        <select value={commissionPct} onChange={(e) => setCommissionPct(e.target.value)} className="bg-white/10 border-none rounded-lg p-2 text-xs text-white">
+                          <option value="10">10%</option><option value="20">20%</option><option value="30">30%</option><option value="40">40%</option><option value="50">50%</option>
                         </select>
                       </div>
-                    </>
-                  )}
-
-                  {txType === "income" && (
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Origem da Receita</label>
-                      <select name="incomeSourceId" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
-                        onChange={(e) => setShowNewSource(e.target.value === "NEW")}
-                      >
-                        {data.incomeSources?.map((s: any) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                        <option value="NEW">+ Criar Nova Fonte...</option>
-                      </select>
-                      {showNewSource && (
-                        <input name="newSourceName" required type="text" placeholder="Nome da nova fonte de receita" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500" />
-                      )}
-                    </div>
-                  )}
-
-                  <div className="pt-2">
-                    <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 cursor-pointer">
-                      <input type="checkbox" name="isPaid" value="true" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer" />
-                      <span>Lançamento já está Efetivado (Pago/Recebido) na conta atual</span>
-                    </label>
+                    )}
                   </div>
+                )}
 
-                  <div className="pt-4 flex items-center justify-end space-x-3 border-t border-slate-100">
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                    <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                      {isSubmitting ? "Processando..." : "Gravar Lançamento"}
-                    </button>
-                  </div>
-                </form>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Notas / Cliente</label>
+                  <textarea name="notes" rows={2} placeholder="Identifique o cliente ou projeto..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm" />
+                </div>
               </div>
-            </div>
-          )
-        }
-      </main>
+
+              <div className="flex items-center gap-4 pt-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:text-white transition-colors">Cancelar</button>
+                <button
+                  disabled={isSubmitting}
+                  type="submit"
+                  className="flex-[2] h-12 bg-primary text-white rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50"
+                >
+                  {isSubmitting ? "Gravando..." : "Confirmar Lançamento"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Subcomponents helper
-
 function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete }: any) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all group">
-      <div className="flex items-start sm:items-center mb-4 sm:mb-0">
-        <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center mr-4 ${t.type === "income" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-          }`}>
-          {t.type === "income" ? <ArrowDownToLine className="w-5 h-5" /> : <ArrowUpFromLine className="w-5 h-5" />}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group relative overflow-hidden">
+      <div className="flex items-center gap-6">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${t.type === "income" ? "bg-success/10 text-success shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "bg-danger/10 text-danger shadow-[0_0_20px_rgba(244,63,94,0.1)]"}`}>
+          <span className="material-symbols-outlined text-2xl">{t.type === "income" ? "arrow_downward" : "arrow_upward"}</span>
         </div>
         <div>
-          <p className="font-bold text-slate-800 text-base">{t.name}</p>
-          <div className="flex items-center space-x-2 mt-1">
-            <span className={`px-2 py-0.5 rounded font-semibold text-[10px] uppercase tracking-wider ${t.status === "received" || t.status === "paid" ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-700"
-              }`}>{t.status === "expected" || t.status === "pending" ? "A vencer/esperado" : t.status === "received" || t.status === "paid" ? "Baixado" : t.status}</span>
-            <span className="text-xs font-medium text-slate-500">Vencimento: {t.displayDate}</span>
+          <h4 className="text-lg font-bold text-white tracking-tight">{t.name}</h4>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-widest ${t.status === 'paid' || t.status === 'received' ? 'bg-white/10 text-slate-500' : 'bg-warning/20 text-warning'}`}>
+              {t.status === 'expected' || t.status === 'pending' ? 'Pendente' : 'Liquidado'}
+            </span>
+            <span className="text-xs font-bold text-slate-500">Vence {t.displayDate}</span>
           </div>
-          {t.notes && (
-            <p className="text-xs text-slate-400 mt-1 italic line-clamp-1">Ref: {t.notes}</p>
-          )}
+          {t.notes && <p className="text-xs text-slate-400 mt-2 italic flex items-center gap-1.5"><span className="material-symbols-outlined text-xs">info</span> {t.notes}</p>}
         </div>
       </div>
 
-      <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto mt-2 sm:mt-0 space-x-4 pl-14 sm:pl-0">
-        <div className={`font-bold text-lg tracking-tight ${t.type === "income" ? "text-emerald-600" : "text-slate-900"
-          }`}>
-          {t.type === "income" ? "+" : "-"} R$ {Math.abs(t.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+      <div className="flex items-center justify-between sm:justify-end gap-6 mt-4 sm:mt-0 pl-20 sm:pl-0 w-full sm:w-auto">
+        <div className={`text-2xl font-black tracking-tighter ${t.type === 'income' ? 'text-success' : 'text-white'}`}>
+          {t.type === 'income' ? '+' : '-'} R$ {Math.abs(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 lg:opacity-0 group-hover:opacity-100 transition-all">
           {(t.status === "pending" || t.status === "expected") && (
             <button
               disabled={payingId === t.id}
               onClick={() => handleMarkPaid(t.id, t.type)}
-              className="px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm"
+              className="bg-white text-slate-900 h-10 px-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl active:scale-95"
             >
-              {payingId === t.id ? "Marcando..." : (t.type === "income" ? "Dar Baixa" : "Pagar Conta")}
+              Baixar
             </button>
           )}
-
           <button
             disabled={deletingId === t.id}
             onClick={() => handleDelete(t.id, t.type)}
-            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-            title="Excluir Lançamento"
+            className="w-10 h-10 rounded-xl bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center active:scale-90 shadow-xl"
           >
-            <Trash2 className="w-4 h-4" />
+            <span className="material-symbols-outlined text-xl">delete</span>
           </button>
         </div>
       </div>
@@ -655,37 +459,44 @@ function NavItem({ icon, label, active, badge, onClick }: any) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${active ? "bg-blue-600/10 text-blue-500" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-        }`}
+      className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-300 group ${active ? "bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]" : "text-slate-500 hover:text-white hover:bg-white/5"}`}
     >
-      <div className="flex items-center">
-        <span className={`mr-3 ${active ? "opacity-100" : "opacity-70"}`}>{icon && React.cloneElement(icon, { className: "w-5 h-5" })}</span>
-        {label}
-      </div>
-      {badge && badge !== "0" && <span className="bg-rose-500 text-white text-[10px] uppercase font-bold px-1.5 py-0.5 rounded shadow-sm">{badge}</span>}
+      <span className={`material-symbols-outlined transition-colors ${active ? "text-white" : "group-hover:text-primary"}`}>{icon}</span>
+      <span className="hidden lg:block uppercase tracking-widest text-[11px] font-black">{label}</span>
+      {badge && badge !== "0" && !active && <span className="ml-auto bg-primary text-white text-[10px] h-5 w-5 rounded-full flex items-center justify-center font-black animate-pulse">{badge}</span>}
+    </button>
+  );
+}
+
+function MobileNavItem({ icon, active, onClick }: any) {
+  return (
+    <button onClick={onClick} className={`p-3 rounded-xl transition-all ${active ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-110' : 'text-slate-500'}`}>
+      <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: active ? "'FILL' 1" : "" }}>{icon}</span>
     </button>
   );
 }
 
 function KpiCard({ title, value, trend, trendUp, icon, color }: any) {
-  const colorMap: any = {
-    blue: "bg-blue-50 border-blue-100",
-    green: "bg-emerald-50 border-emerald-100",
-    red: "bg-rose-50 border-rose-100",
-    amber: "bg-amber-50 border-amber-100",
+  const colors: any = {
+    primary: "from-primary/20 to-primary/5 text-primary border-primary/20 shadow-primary/5",
+    success: "from-success/20 to-success/5 text-success border-success/20 shadow-success/5",
+    danger: "from-danger/20 to-danger/5 text-danger border-danger/20 shadow-danger/5",
+    warning: "from-warning/20 to-warning/5 text-warning border-warning/20 shadow-warning/5",
   };
-  const trendColor = trendUp ? "text-emerald-600" : "text-rose-600";
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm relative overflow-hidden group">
-      <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full ${colorMap[color]} opacity-50 -z-10 group-hover:scale-110 transition-transform`}></div>
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-sm font-semibold text-slate-500">{title}</h3>
-        <div className={`p-2 rounded-lg ${colorMap[color]}`}>{icon}</div>
+    <div className={`relative overflow-hidden bg-gradient-to-br ${colors[color]} backdrop-blur-xl border rounded-[2rem] p-6 shadow-2xl transition-all hover:scale-[1.02] hover:border-white/20 group`}>
+      <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+      <div className="flex justify-between items-start mb-6">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{title}</h3>
+        <div className={`p-2.5 rounded-xl bg-white/10 backdrop-blur-md`}>
+          <span className="material-symbols-outlined text-xl">{icon}</span>
+        </div>
       </div>
       <div>
-        <div className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">{value}</div>
-        <div className="flex items-center justify-between mt-2">
-          <div className={`flex items-center text-xs font-semibold ${trendColor}`}>{trend}</div>
+        <div className="text-2xl font-black text-white tracking-tighter mb-2 truncate">{value}</div>
+        <div className="flex items-center justify-between">
+          <div className={`text-[10px] font-black px-2 py-0.5 rounded bg-white/5 ${trendUp ? 'text-success' : 'text-danger'}`}>{trend}</div>
         </div>
       </div>
     </div>
