@@ -210,6 +210,22 @@ export default function DashboardClient({ data }: { data: any }) {
                   />
                 </div>
 
+                {kpis.pendingCommissions > 0 && (
+                  <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-6 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-xl font-bold flex items-center">
+                        <Target className="w-6 h-6 mr-2" />
+                        Comissões a Receber do Mês
+                      </h2>
+                      <p className="opacity-90 text-sm mt-1">Lembre-se de cobrar ou acompanhar estes valores para bater sua meta!</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold uppercase tracking-wider opacity-70">Total Pendente</span>
+                      <div className="text-4xl font-black">R$ {kpis.pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                    </div>
+                  </div>
+                )}
+
                 {/* FAIXA 2: Gráfico e Agenda */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* O Fluxo Futuro */}
@@ -508,6 +524,11 @@ export default function DashboardClient({ data }: { data: any }) {
                     </div>
                   )}
 
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Notas / Nome do Cliente</label>
+                    <textarea name="notes" rows={2} placeholder="Ex: Cliente João Silva, Venda de Site..." className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white" />
+                  </div>
+
                   {txType === "expense" && (
                     <>
                       <div>
@@ -593,6 +614,9 @@ function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete 
               }`}>{t.status === "expected" || t.status === "pending" ? "A vencer/esperado" : t.status === "received" || t.status === "paid" ? "Baixado" : t.status}</span>
             <span className="text-xs font-medium text-slate-500">Vencimento: {t.displayDate}</span>
           </div>
+          {t.notes && (
+            <p className="text-xs text-slate-400 mt-1 italic line-clamp-1">Ref: {t.notes}</p>
+          )}
         </div>
       </div>
 

@@ -101,6 +101,11 @@ export async function getDashboardData() {
 
     const accountBalance = defaultAccount?.currentBalance || 0;
 
+    // Calculo específico para comissões a receber no mês
+    const pendingCommissions = incomes
+        .filter(i => i.title.toLowerCase().includes("comissão") && (i.status === "expected" || i.status === "partial"))
+        .reduce((acc, curr) => acc + (curr.expectedAmount - curr.receivedAmount), 0);
+
     // Saldo Projetado na regra Ouro: Saldo Atual + A Receber - A Pagar (Tudo referente ao mês)
     const projectedBalance = accountBalance + remainingIncome - pendingExpense;
 
@@ -114,6 +119,7 @@ export async function getDashboardData() {
             displayDate: e.dueDate.toLocaleDateString("pt-BR"),
             status: e.status,
             nature: e.nature, // enviando nature para o client
+            notes: e.notes,
         })),
         ...incomes.map(i => ({
             id: i.id,
@@ -123,6 +129,7 @@ export async function getDashboardData() {
             date: i.dueDate.toISOString(),
             displayDate: i.dueDate.toLocaleDateString("pt-BR"),
             status: i.status,
+            notes: i.notes,
         }))
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -137,6 +144,7 @@ export async function getDashboardData() {
             paidExpense: paidExpense / 100,
             pendingExpense: pendingExpense / 100,
             projectedBalance: projectedBalance / 100,
+            pendingCommissions: pendingCommissions / 100,
         },
         spentByNature: {
             essential: spentByNature.essential / 100,

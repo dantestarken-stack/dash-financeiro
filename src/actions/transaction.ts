@@ -12,6 +12,7 @@ export async function createTransaction(formData: FormData) {
     const incomeSourceId = formData.get("incomeSourceId") as string;
     const categoryId = formData.get("categoryId") as string;
     const nature = formData.get("nature") as string || "essential";
+    const notes = formData.get("notes") as string || "";
     const isPaid = formData.get("isPaid") === "true"; // Checkbox opcional: "Já está pago/recebido"
 
     const newCategoryName = formData.get("newCategoryName") as string;
@@ -61,6 +62,7 @@ export async function createTransaction(formData: FormData) {
                 dueDate,
                 receivedDate: isPaid ? new Date() : null,
                 competencyDate,
+                notes,
             }
         });
 
@@ -99,6 +101,7 @@ export async function createTransaction(formData: FormData) {
                 dueDate,
                 paidDate: isPaid ? new Date() : null,
                 competencyDate,
+                notes,
             }
         });
 
