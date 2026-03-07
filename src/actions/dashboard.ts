@@ -3,55 +3,15 @@
 import prisma from "@/lib/prisma";
 import { startOfMonth, endOfMonth, addMonths, isBefore, isSameMonth } from "date-fns";
 
-export async function getDashboardData(year?: number, month?: number) {
-    // 1. Setup Básico (Se o db estiver zerado, cria usuário local MOCK)
-    let user = await prisma.user.findFirst();
-    let defaultAccount;
+export async function getDashboardData(year: number, month: number, userId: string) {
+    // 1. Setup Básico
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new Error("Usuário não encontrado.");
 
-    if (!user) {
-        user = await prisma.user.create({
-            data: {
-                name: "Dante",
-                email: "dante.admin@local.com",
-                passwordHash: "masterpassword", // só pro mvp
-                onboardingCompleted: true,
-            },
-        });
+    const defaultAccount = await prisma.account.findFirst({ where: { userId } });
 
-        defaultAccount = await prisma.account.create({
-            data: {
-                userId: user.id,
-                name: "Conta Corrente",
-                type: "checking",
-                currentBalance: 0,
-            },
-        });
-
-        // Cria algumas categorias basicas
-        await prisma.expenseCategory.createMany({
-            data: [
-                { userId: user.id, name: "Moradia", icon: "home" },
-                { userId: user.id, name: "Transporte", icon: "car" },
-                { userId: user.id, name: "Alimentação", icon: "pizza" },
-                { userId: user.id, name: "Assinaturas", icon: "tv" },
-            ],
-        });
-
-        await prisma.incomeSource.createMany({
-            data: [
-                { userId: user.id, name: "Empresa Fixa", type: "fixed" },
-                { userId: user.id, name: "Comissões", type: "variable" },
-            ],
-        });
-    } else {
-        defaultAccount = await prisma.account.findFirst({ where: { userId: user.id } });
-    }
-
-    // 2. Cálculos Reais do Dashboard para o mês solicitado ou atual
-    let baseDate = new Date();
-    if (year !== undefined && month !== undefined) {
-        baseDate = new Date(year, month);
-    }
+    // 2. Cálculos Reais do Dashboard para o mês solicitado
+    const baseDate = new Date(year, month);
     const firstDay = startOfMonth(baseDate);
     const lastDay = endOfMonth(baseDate);
 
@@ -74,9 +34,14 @@ export async function getDashboardData(year?: number, month?: number) {
         },
     });
 
+    // Attachments
+    const attachments = await prisma.attachment.findMany({
+        where: { userId: user.id }
+    });
+
     // Agregações (Soma em centavos para nao quebrar javascript math).
     let actualIncome = 0;
-    let remainingIncome = 0; // expected que nao foi recebida
+    let remainingIncome = 0;
 
     incomes.forEach(i => {
         actualIncome += i.receivedAmount;
@@ -112,7 +77,7 @@ export async function getDashboardData(year?: number, month?: number) {
         .filter(i => i.title.toLowerCase().includes("comissão") && (i.status === "expected" || i.status === "partial"))
         .reduce((acc, curr) => acc + (curr.expectedAmount - curr.receivedAmount), 0);
 
-    // Saldo Projetado na regra Ouro: Saldo Atual + A Receber - A Pagar (Tudo referente ao mês)
+    // Saldo Projetado: Saldo Atual + A Receber - A Pagar
     const projectedBalance = accountBalance + remainingIncome - pendingExpense;
 
     const mappedTransactions = [
@@ -121,12 +86,13 @@ export async function getDashboardData(year?: number, month?: number) {
             name: e.title,
             amount: -(e.amount / 100),
             type: "expense",
-            date: e.dueDate.toISOString(), // toISOString para ordenação precisa no frontend
+            date: e.dueDate.toISOString(),
             displayDate: e.dueDate.toLocaleDateString("pt-BR"),
             status: e.status,
-            nature: e.nature, // enviando nature para o client
+            nature: e.nature,
             notes: e.notes,
             isRecurring: e.isRecurring,
+            attachmentUrl: attachments.find(a => a.relatedEntityId === e.id)?.fileUrl
         })),
         ...incomes.map(i => ({
             id: i.id,
@@ -138,6 +104,7 @@ export async function getDashboardData(year?: number, month?: number) {
             status: i.status,
             notes: i.notes,
             isRecurring: i.isRecurring,
+            attachmentUrl: attachments.find(a => a.relatedEntityId === i.id)?.fileUrl
         }))
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -147,7 +114,7 @@ export async function getDashboardData(year?: number, month?: number) {
     const liabilities = await prisma.liability.findMany({ where: { userId: user.id } });
     const goals = await prisma.goal.findMany({ where: { userId: user.id } });
 
-    // Budget Progress calculation for the month
+    // Budget Progress
     const budgetStatus = expenseCategories.map(cat => {
         const spentVal = expenses
             .filter(e => e.categoryId === cat.id)
@@ -161,7 +128,6 @@ export async function getDashboardData(year?: number, month?: number) {
             percent: cat.budgetLimit > 0 ? (spentVal / cat.budgetLimit) * 100 : 0
         };
     }).filter(c => c.limit > 0);
-
 
     const totalAssets = assets.reduce((acc, curr) => acc + curr.amount, 0);
     const totalLiabilities = liabilities.reduce((acc, curr) => acc + curr.outstandingAmount, 0);
@@ -185,7 +151,7 @@ export async function getDashboardData(year?: number, month?: number) {
             important: spentByNature.important / 100,
             superfluous: spentByNature.superfluous / 100,
         },
-        user,
+        user: { id: user.id, name: user.name, email: user.email },
         defaultAccountId: defaultAccount?.id,
         recentTransactions: [...mappedTransactions].reverse().slice(0, 5),
         allTransactions: mappedTransactions,
@@ -208,7 +174,6 @@ async function materializeRecurringTransactions(userId: string, targetMonthDate:
     });
 
     for (const rule of rules) {
-        // Ignorar se a regra começou depois do mês alvo
         if (isBefore(targetMonthDate, startOfMonth(rule.startDate)) && !isSameMonth(targetMonthDate, rule.startDate)) continue;
         if (rule.endDate && isBefore(rule.endDate, targetMonthDate)) continue;
 

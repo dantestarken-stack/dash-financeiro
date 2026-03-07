@@ -2,26 +2,35 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { decrypt } from "@/lib/auth";
+
+async function getUserId() {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("session")?.value;
+    if (!token) return null;
+    const session = await decrypt(token);
+    return session.userId;
+}
 
 export async function createAsset(formData: FormData) {
+    const userId = await getUserId();
+    if (!userId) throw new Error("Não autorizado");
+
     const name = formData.get("name") as string;
     const type = formData.get("type") as string;
     const amountStr = formData.get("amount") as string;
     const notes = formData.get("notes") as string || "";
 
-    // Parse amount to cents
     let cleanedString = amountStr;
     if (amountStr.includes(",")) {
         cleanedString = amountStr.replace(/\./g, "").replace(",", ".");
     }
     const amountCentavos = Math.round(parseFloat(cleanedString) * 100);
 
-    const user = await prisma.user.findFirst();
-    if (!user) throw new Error("Usuário não encontrado");
-
     await prisma.asset.create({
         data: {
-            userId: user.id,
+            userId,
             name,
             type,
             amount: amountCentavos,
@@ -35,6 +44,9 @@ export async function createAsset(formData: FormData) {
 }
 
 export async function createLiability(formData: FormData) {
+    const userId = await getUserId();
+    if (!userId) throw new Error("Não autorizado");
+
     const name = formData.get("name") as string;
     const type = formData.get("type") as string;
     const totalAmountStr = formData.get("totalAmount") as string;
@@ -54,12 +66,9 @@ export async function createLiability(formData: FormData) {
     const outstandingAmount = parseCentavos(outstandingAmountStr);
     const monthlyPayment = parseCentavos(monthlyPaymentStr);
 
-    const user = await prisma.user.findFirst();
-    if (!user) throw new Error("Usuário não encontrado");
-
     await prisma.liability.create({
         data: {
-            userId: user.id,
+            userId,
             name,
             type,
             totalAmount,
@@ -74,13 +83,17 @@ export async function createLiability(formData: FormData) {
 }
 
 export async function deleteAsset(id: string) {
-    await prisma.asset.delete({ where: { id } });
+    const userId = await getUserId();
+    if (!userId) throw new Error("Não autorizado");
+    await prisma.asset.delete({ where: { id, userId } });
     revalidatePath("/");
     return { success: true };
 }
 
 export async function deleteLiability(id: string) {
-    await prisma.liability.delete({ where: { id } });
+    const userId = await getUserId();
+    if (!userId) throw new Error("Não autorizado");
+    await prisma.liability.delete({ where: { id, userId } });
     revalidatePath("/");
     return { success: true };
 }

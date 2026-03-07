@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
 import { createAsset, createLiability, deleteAsset, deleteLiability } from "@/actions/patrimony";
 import { createGoal, updateGoalProgress, deleteGoal, updateCategoryBudget } from "@/actions/goal";
+import { logoutAction } from "@/actions/auth";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, isSameDay, isToday, addMonths, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -190,6 +191,19 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
           <NavItem icon="account_balance" label="Patrimônio" active={activeTab === "patrimony"} onClick={() => setActiveTab("patrimony")} />
           <NavItem icon="target" label="Metas & Tetos" active={activeTab === "metas"} onClick={() => setActiveTab("metas")} />
         </nav>
+        <div className="p-4 border-t border-white/5 space-y-2">
+          <div className="px-4 py-2 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-black text-xs uppercase">{data.user?.name?.substring(0, 2)}</div>
+            <div className="hidden lg:block">
+              <p className="text-[10px] font-black text-white truncate">{data.user?.name}</p>
+              <p className="text-[8px] font-bold text-slate-500 truncate">{data.user?.email}</p>
+            </div>
+          </div>
+          <button onClick={() => logoutAction()} className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-xs font-bold text-slate-500 hover:text-danger hover:bg-danger/10 transition-all group">
+            <span className="material-symbols-outlined text-sm group-hover:text-danger">logout</span>
+            <span className="hidden lg:block uppercase tracking-widest font-black">Encerrar Sessão</span>
+          </button>
+        </div>
       </aside>
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-20 border-b border-white/5 flex items-center justify-between px-6 lg:px-10 z-10 w-full shrink-0 bg-slate-900/20 backdrop-blur-md">
@@ -389,8 +403,9 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
 
                             <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-0.5">
                               {dayTx.map((t: any) => (
-                                <div key={t.id} className={`px-2 py-1 rounded-lg text-[9px] font-bold leading-tight truncate ${t.type === 'income' ? 'bg-success/20 text-success border border-success/20' : 'bg-danger/20 text-white/90 border border-danger/20'} ${t.status === 'paid' || t.status === 'received' ? 'opacity-40 grayscale-[0.5]' : ''}`}>
-                                  R${Math.abs(t.amount).toLocaleString('pt-BR')} {t.name}
+                                <div key={t.id} className={`px-2 py-1 rounded-lg text-[9px] font-bold leading-tight flex items-center justify-between gap-1 ${t.type === 'income' ? 'bg-success/20 text-success border border-success/20' : 'bg-danger/20 text-white/90 border border-danger/20'} ${t.status === 'paid' || t.status === 'received' ? 'opacity-40 grayscale-[0.5]' : ''}`}>
+                                  <span className="truncate">R${Math.abs(t.amount).toLocaleString('pt-BR')} {t.name}</span>
+                                  {t.attachmentUrl && <span className="material-symbols-outlined text-[10px] shrink-0">description</span>}
                                 </div>
                               ))}
                             </div>
@@ -676,6 +691,16 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                   </div>
                 )}
                 <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Notas / Cliente</label><textarea name="notes" rows={2} placeholder="Identifique o cliente..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm" /></div>
+
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Anexar Comprovante / PDF</label>
+                  <div className="relative h-14 bg-white/5 border border-white/10 rounded-xl border-dashed hover:border-primary/50 transition-all flex items-center px-4 overflow-hidden">
+                    <input type="file" name="attachment" className="absolute inset-0 opacity-0 cursor-pointer" />
+                    <span className="material-symbols-outlined text-slate-500 mr-2">upload_file</span>
+                    <span className="text-xs text-slate-400 font-bold truncate">Arraste ou selecione o arquivo...</span>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
                   <input type="checkbox" name="isPaid" value="true" id="isPaid" className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" />
                   <label htmlFor="isPaid" className="text-sm font-bold text-slate-300">Marcar como {txType === 'income' ? 'Recebido' : 'Pago'} agora {isInstallment ? '(Apenas 1ª parcela)' : ''}</label>
@@ -837,6 +862,11 @@ function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete 
           <h4 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
             {t.name}
             {t.isRecurring && <span className="material-symbols-outlined text-primary text-sm">sync</span>}
+            {t.attachmentUrl && (
+              <a href={t.attachmentUrl} target="_blank" className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/20 text-primary hover:bg-primary hover:text-white transition-all shadow-sm">
+                <span className="material-symbols-outlined text-sm">description</span>
+              </a>
+            )}
           </h4>
           <div className="flex items-center gap-3 mt-1.5"><span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-widest ${t.status === 'paid' || t.status === 'received' ? 'bg-white/10 text-slate-500' : 'bg-warning/20 text-warning'}`}>{t.status === 'expected' || t.status === 'pending' ? 'Pendente' : 'Liquidado'}</span><span className="text-xs font-bold text-slate-500">Vence {t.displayDate}</span></div>
           {t.notes && <p className="text-xs text-slate-400 mt-2 italic flex items-center gap-1.5"><span className="material-symbols-outlined text-xs">info</span> {t.notes}</p>}
