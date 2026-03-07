@@ -17,6 +17,8 @@ import { useRouter } from "next/navigation";
 import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
 import { createAsset, createLiability, deleteAsset, deleteLiability } from "@/actions/patrimony";
 import { createGoal, updateGoalProgress, deleteGoal, updateCategoryBudget } from "@/actions/goal";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, isSameDay, isToday, addMonths, isSameMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function DashboardClient({ data, currentMonth, currentYear }: { data: any, currentMonth: number, currentYear: number }) {
   const router = useRouter();
@@ -328,14 +330,89 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                 </div>
               </>
             )}
-            {(activeTab === "incomes" || activeTab === "expenses" || activeTab === "agenda") && (
+            {(activeTab === "incomes" || activeTab === "expenses") && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                <h2 className="text-2xl font-black text-white uppercase tracking-tight">{activeTab === "incomes" ? "Portfólio de Receitas" : activeTab === "expenses" ? "Centro de Despesas" : "Agenda de Compromissos"}</h2>
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight">{activeTab === "incomes" ? "Portfólio de Receitas" : "Centro de Despesas"}</h2>
                 <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
                   <div className="p-8 space-y-4">
-                    {allTransactions.filter((t: any) => activeTab === "agenda" ? true : t.type === (activeTab === "incomes" ? "income" : "expense")).length === 0 ? <div className="py-20 text-center text-slate-500 font-medium">Nenhum registro tático encontrado.</div> : allTransactions.filter((t: any) => activeTab === "agenda" ? true : t.type === (activeTab === "incomes" ? "income" : "expense")).map((t: any) => (
+                    {allTransactions.filter((t: any) => t.type === (activeTab === "incomes" ? "income" : "expense")).length === 0 ? <div className="py-20 text-center text-slate-500 font-medium">Nenhum registro tático encontrado.</div> : allTransactions.filter((t: any) => t.type === (activeTab === "incomes" ? "income" : "expense")).map((t: any) => (
                       <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
                     ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "agenda" && (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div>
+                    <h2 className="text-3xl font-black text-white tracking-tight leading-none uppercase">Calendário do Comandante</h2>
+                    <p className="text-slate-400 text-sm font-medium mt-2">Visão tática de fluxo de caixa por dia.</p>
+                  </div>
+                  <div className="flex items-center bg-white/5 rounded-2xl border border-white/10 p-1 backdrop-blur-md">
+                    <div className="px-4 text-xs font-black uppercase text-primary border-r border-white/10 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-success"></div> Receitas
+                    </div>
+                    <div className="px-4 text-xs font-black uppercase text-danger flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-danger"></div> Despesas
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl p-4 lg:p-8">
+                  <div className="grid grid-cols-7 mb-4">
+                    {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(day => (
+                      <div key={day} className="text-center text-[10px] font-black uppercase tracking-widest text-slate-500 py-4">{day}</div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1 lg:gap-3">
+                    {(() => {
+                      const monthStart = startOfMonth(new Date(currentYear, currentMonth));
+                      const monthEnd = endOfMonth(monthStart);
+                      const startDate = startOfWeek(monthStart);
+                      const endDate = endOfWeek(monthEnd);
+                      const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+                      return calendarDays.map((day, idx) => {
+                        const dayTx = allTransactions.filter((t: any) => isSameDay(new Date(t.date), day));
+                        const isSelectedMonth = isSameMonth(day, monthStart);
+                        const isCurrentDay = isToday(day);
+
+                        return (
+                          <div key={idx} className={`min-h-[100px] lg:min-h-[140px] rounded-2xl border transition-all p-2 lg:p-3 flex flex-col gap-1.5 ${isSelectedMonth ? 'bg-white/[0.03] border-white/5' : 'opacity-20 border-transparent'} ${isCurrentDay ? 'border-primary/50 shadow-[0_0_20px_rgba(19,91,236,0.15)] bg-primary/5' : ''} hover:bg-white/[0.08] hover:border-white/10`}>
+                            <div className="flex justify-between items-center px-1">
+                              <span className={`text-xs font-black ${isCurrentDay ? 'text-primary' : isSelectedMonth ? 'text-slate-400' : 'text-slate-600'}`}>{format(day, "d")}</span>
+                              {dayTx.length > 0 && isSelectedMonth && <span className="text-[10px] font-black text-white/20">{dayTx.length} items</span>}
+                            </div>
+
+                            <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pr-0.5">
+                              {dayTx.map((t: any) => (
+                                <div key={t.id} className={`px-2 py-1 rounded-lg text-[9px] font-bold leading-tight truncate ${t.type === 'income' ? 'bg-success/20 text-success border border-success/20' : 'bg-danger/20 text-white/90 border border-danger/20'} ${t.status === 'paid' || t.status === 'received' ? 'opacity-40 grayscale-[0.5]' : ''}`}>
+                                  R${Math.abs(t.amount).toLocaleString('pt-BR')} {t.name}
+                                </div>
+                              ))}
+                            </div>
+
+                            {dayTx.length > 0 && isSelectedMonth && (
+                              <div className="mt-auto pt-1 flex flex-col gap-0.5 border-t border-white/5">
+                                {dayTx.filter((t: any) => t.type === 'income').length > 0 && (
+                                  <div className="text-[8px] font-black text-success uppercase text-right tracking-tighter cursor-default">
+                                    + R$ {dayTx.filter((t: any) => t.type === 'income').reduce((acc: any, curr: any) => acc + curr.amount, 0).toLocaleString('pt-BR')}
+                                  </div>
+                                )}
+                                {dayTx.filter((t: any) => t.type === 'expense').length > 0 && (
+                                  <div className="text-[8px] font-black text-danger uppercase text-right tracking-tighter cursor-default">
+                                    - R$ {Math.abs(dayTx.filter((t: any) => t.type === 'expense').reduce((acc: any, curr: any) => acc + curr.amount, 0)).toLocaleString('pt-BR')}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               </div>
