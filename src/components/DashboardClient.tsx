@@ -171,15 +171,15 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
   return (
     <div className="flex h-screen bg-mesh text-slate-100 font-sans selection:bg-primary/30 overflow-hidden">
       <aside className="w-20 lg:w-64 bg-slate-900/40 backdrop-blur-xl border-r border-white/5 flex flex-col hidden md:flex shrink-0">
-        <div className="h-20 flex items-center px-6 gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+        <a href="/" className="h-20 flex items-center px-6 gap-3 group transition-all">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-110 group-hover:rotate-3 transition-all">
             <span className="material-symbols-outlined text-2xl">account_balance_wallet</span>
           </div>
           <div className="hidden lg:block truncate">
-            <h1 className="text-sm font-bold leading-tight">Financial Command</h1>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Intelligence Pro</p>
+            <h1 className="text-sm font-black leading-tight tracking-tighter">MINHAS</h1>
+            <p className="text-[10px] text-primary uppercase tracking-widest font-black">FINANÇAS</p>
           </div>
-        </div>
+        </a>
         <nav className="flex-1 py-6 px-4 space-y-2">
           <NavItem icon="dashboard" label="Painel" active={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
           <NavItem icon="payments" label="Receitas" active={activeTab === "incomes"} onClick={() => setActiveTab("incomes")} />
@@ -221,7 +221,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
               <>
                 <div className="flex flex-col gap-1">
                   <h2 className="text-3xl font-black text-white tracking-tight">Olá, {data.user?.name || "Comandante"}</h2>
-                  <p className="text-slate-400 text-sm font-medium">Sua inteligência local SQLite para {new Date(currentYear, currentMonth).toLocaleDateString("pt-BR", { month: 'long' })} está atualizada.</p>
+                  <p className="text-slate-400 text-sm font-medium">Sua inteligência financeira para {new Date(currentYear, currentMonth).toLocaleDateString("pt-BR", { month: 'long' })} está atualizada.</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <KpiCard title="Saldo Atual" value={`R$ ${kpis.accountBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="+2.4%" trendUp={true} icon="account_balance" color="primary" />

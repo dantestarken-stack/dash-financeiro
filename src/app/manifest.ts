@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
     return {
-        name: 'Financial Command Center',
-        short_name: 'Comando',
+        name: 'MINHAS FINANÇAS',
+        short_name: 'Minhas Finanças',
         description: 'Sistema de gestão financeira pessoal e previsibilidade.',
         start_url: '/',
         display: 'standalone',

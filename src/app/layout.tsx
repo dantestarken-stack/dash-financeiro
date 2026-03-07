@@ -9,8 +9,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Financial Command Center",
-  description: "Seuseu centro de comando financeiro de elite.",
+  title: "MINHAS FINANÇAS",
+  description: "Seu centro de comando financeiro de elite.",
   manifest: "/manifest",
 };
 
