@@ -9,6 +9,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import { useRouter } from "next/navigation";
 import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
@@ -36,6 +39,9 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
   // Installment logic states
   const [isInstallment, setIsInstallment] = useState(false);
   const [installmentsCount, setInstallmentsCount] = useState("2");
+
+  // Recurring logic state
+  const [isRecurring, setIsRecurring] = useState(false);
 
   let computedAmount = "";
   if (isCommission && contractValue && commissionPct) {
@@ -224,18 +230,70 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     </div>
                   </div>
                   <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-8 flex flex-col shadow-xl">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 mb-8">Movimentações</h3>
-                    <div className="flex-1 space-y-4">
-                      {recentTransactions.length === 0 ? <div className="text-sm text-slate-500 text-center py-20 italic">Centro sem comando.</div> : recentTransactions.map((t: any) => (
-                        <div key={t.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${t.type === 'income' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}><span className="material-symbols-outlined text-xl">{t.type === 'income' ? 'add' : 'remove'}</span></div>
-                            <div className="max-w-[120px]"><p className="text-sm font-bold text-white truncate">{t.name}</p><p className="text-[10px] text-slate-500 font-bold uppercase">{t.displayDate}</p></div>
-                          </div>
-                          <p className={`text-sm font-black ${t.type === 'income' ? 'text-success' : 'text-white'}`}>{t.type === 'income' ? '+' : '-'} {Math.abs(t.amount).toLocaleString('pt-BR')}</p>
-                        </div>
-                      ))}
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-6">
+                      <span className="material-symbols-outlined text-primary">donut_large</span>
+                      Qualidade do Gasto
+                    </h3>
+                    <div className="h-[200px] w-full relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Essencial', value: data.spentByNature.essential, color: '#10b981' },
+                              { name: 'Importante', value: data.spentByNature.important, color: '#f59e0b' },
+                              { name: 'Supérfluo', value: data.spentByNature.superfluous, color: '#f43f5e' },
+                            ].filter(d => d.value > 0)}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={70}
+                            paddingAngle={8}
+                            dataKey="value"
+                          >
+                            {[
+                              { name: 'Essencial', color: '#10b981' },
+                              { name: 'Importante', color: '#f59e0b' },
+                              { name: 'Supérfluo', color: '#f43f5e' },
+                            ].map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px' }}
+                            itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                            formatter={(value: any) => `R$ ${parseFloat(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                        <span className="text-success">Essencial</span>
+                        <span className="text-white">{Math.round((data.spentByNature.essential / (data.spentByNature.essential + data.spentByNature.important + data.spentByNature.superfluous || 1)) * 100)}%</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                        <span className="text-warning">Importante</span>
+                        <span className="text-white">{Math.round((data.spentByNature.important / (data.spentByNature.essential + data.spentByNature.important + data.spentByNature.superfluous || 1)) * 100)}%</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                        <span className="text-danger">Supérfluo</span>
+                        <span className="text-white">{Math.round((data.spentByNature.superfluous / (data.spentByNature.essential + data.spentByNature.important + data.spentByNature.superfluous || 1)) * 100)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-8 flex flex-col shadow-xl">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 mb-8">Movimentações Recentes</h3>
+                  <div className="space-y-4">
+                    {recentTransactions.length === 0 ? <div className="text-sm text-slate-500 text-center py-20 italic">Centro sem comando.</div> : recentTransactions.map((t: any) => (
+                      <div key={t.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${t.type === 'income' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}><span className="material-symbols-outlined text-xl">{t.type === 'income' ? 'add' : 'remove'}</span></div>
+                          <div className="max-w-[200px]"><p className="text-sm font-bold text-white truncate">{t.name}</p><p className="text-[10px] text-slate-500 font-bold uppercase">{t.displayDate}</p></div>
+                        </div>
+                        <p className={`text-sm font-black ${t.type === 'income' ? 'text-success' : 'text-white'}`}>{t.type === 'income' ? '+' : '-'} {Math.abs(t.amount).toLocaleString('pt-BR')}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </>
@@ -271,7 +329,6 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* ASSETS */}
                   <div className="space-y-6">
                     <div className="flex justify-between items-center px-2">
                       <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -303,7 +360,6 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     </div>
                   </div>
 
-                  {/* LIABILITIES */}
                   <div className="space-y-6">
                     <div className="flex justify-between items-center px-2">
                       <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -378,22 +434,37 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     <input required name="dueDate" type="date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
                   </div>
                 </div>
+                {txType === "expense" && (
+                  <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" name="isInstallment" value="true" id="isInstallment" checked={isInstallment} onChange={(e) => { setIsInstallment(e.target.checked); if (e.target.checked) setIsRecurring(false); }} className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" />
+                        <label htmlFor="isInstallment" className="text-sm font-bold text-slate-300">Parcelado</label>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" name="isRecurring" value="true" id="isRecurring" checked={isRecurring} onChange={(e) => { setIsRecurring(e.target.checked); if (e.target.checked) setIsInstallment(false); }} className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" />
+                        <label htmlFor="isRecurring" className="text-sm font-bold text-slate-300">Fixo Mensal</label>
+                      </div>
+                    </div>
+                    {isInstallment && (
+                      <div className="flex items-center gap-3 animate-in slide-in-from-top-2"><label className="text-[10px] font-black uppercase tracking-widest text-slate-500 shrink-0">Núm. Parcelas:</label><input name="installmentsCount" type="number" min="2" max="100" value={installmentsCount} onChange={(e) => setInstallmentsCount(e.target.value)} className="w-20 bg-white/10 border-none rounded-lg p-2 text-xs text-white" /></div>
+                    )}
+                  </div>
+                )}
                 {txType === "income" && (
                   <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-4">
-                    <div className="flex items-center gap-3"><input type="checkbox" id="isComm" checked={isCommission} onChange={(e) => setIsCommission(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" /><label htmlFor="isComm" className="text-sm font-bold text-slate-300">Comissão Automatizada</label></div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3"><input type="checkbox" id="isComm" checked={isCommission} onChange={(e) => setIsCommission(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" /><label htmlFor="isComm" className="text-sm font-bold text-slate-300">Comissão</label></div>
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" name="isRecurring" value="true" id="isRecurringInc" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" />
+                        <label htmlFor="isRecurringInc" className="text-sm font-bold text-slate-300">Fixo Mensal</label>
+                      </div>
+                    </div>
                     {isCommission && (
                       <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
                         <input placeholder="Valor Venda" value={contractValue} onChange={(e) => setContractValue(e.target.value)} className="bg-white/10 border-none rounded-lg p-2 text-xs text-white" />
                         <select value={commissionPct} onChange={(e) => setCommissionPct(e.target.value)} className="bg-white/10 border-none rounded-lg p-2 text-xs text-white"><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option></select>
                       </div>
-                    )}
-                  </div>
-                )}
-                {txType === "expense" && (
-                  <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-4">
-                    <div className="flex items-center gap-3"><input type="checkbox" name="isInstallment" value="true" id="isInstallment" checked={isInstallment} onChange={(e) => setIsInstallment(e.target.checked)} className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" /><label htmlFor="isInstallment" className="text-sm font-bold text-slate-300">Despesa Parcelada</label></div>
-                    {isInstallment && (
-                      <div className="flex items-center gap-3 animate-in slide-in-from-top-2"><label className="text-[10px] font-black uppercase tracking-widest text-slate-500 shrink-0">Núm. Parcelas:</label><input name="installmentsCount" type="number" min="2" max="100" value={installmentsCount} onChange={(e) => setInstallmentsCount(e.target.value)} className="w-20 bg-white/10 border-none rounded-lg p-2 text-xs text-white" /></div>
                     )}
                   </div>
                 )}
@@ -501,7 +572,10 @@ function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete 
       <div className="flex items-center gap-6">
         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${t.type === "income" ? "bg-success/10 text-success shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "bg-danger/10 text-danger shadow-[0_0_20px_rgba(244,63,94,0.1)]"}`}><span className="material-symbols-outlined text-2xl">{t.type === "income" ? "arrow_downward" : "arrow_upward"}</span></div>
         <div>
-          <h4 className="text-lg font-bold text-white tracking-tight">{t.name}</h4>
+          <h4 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            {t.name}
+            {t.isRecurring && <span className="material-symbols-outlined text-primary text-sm">sync</span>}
+          </h4>
           <div className="flex items-center gap-3 mt-1.5"><span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-widest ${t.status === 'paid' || t.status === 'received' ? 'bg-white/10 text-slate-500' : 'bg-warning/20 text-warning'}`}>{t.status === 'expected' || t.status === 'pending' ? 'Pendente' : 'Liquidado'}</span><span className="text-xs font-bold text-slate-500">Vence {t.displayDate}</span></div>
           {t.notes && <p className="text-xs text-slate-400 mt-2 italic flex items-center gap-1.5"><span className="material-symbols-outlined text-xs">info</span> {t.notes}</p>}
         </div>

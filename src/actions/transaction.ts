@@ -16,6 +16,7 @@ export async function createTransaction(formData: FormData) {
     const notes = formData.get("notes") as string || "";
     const isPaid = formData.get("isPaid") === "true";
     const isInstallment = formData.get("isInstallment") === "true";
+    const isRecurring = formData.get("isRecurring") === "true";
     const installmentsCount = parseInt(formData.get("installmentsCount") as string || "1");
 
     const newCategoryName = formData.get("newCategoryName") as string;
@@ -66,8 +67,22 @@ export async function createTransaction(formData: FormData) {
                 receivedDate: isPaid ? new Date() : null,
                 competencyDate,
                 notes,
+                isRecurring,
             }
         });
+
+        if (isRecurring) {
+            await prisma.recurringRule.create({
+                data: {
+                    userId: user.id,
+                    entityType: "income",
+                    frequency: "monthly",
+                    startDate: dueDate,
+                    nextRunDate: addMonths(dueDate, 1),
+                    incomes: { connect: { id: income.id } }
+                }
+            });
+        }
 
         if (isPaid) {
             await prisma.account.update({
@@ -141,7 +156,7 @@ export async function createTransaction(formData: FormData) {
         } else {
             const currentStatus = isPaid ? "paid" : "pending";
 
-            await prisma.expense.create({
+            const expense = await prisma.expense.create({
                 data: {
                     userId: user.id,
                     accountId: accountId,
@@ -157,8 +172,22 @@ export async function createTransaction(formData: FormData) {
                     paidDate: isPaid ? new Date() : null,
                     competencyDate,
                     notes,
+                    isRecurring,
                 }
             });
+
+            if (isRecurring) {
+                await prisma.recurringRule.create({
+                    data: {
+                        userId: user.id,
+                        entityType: "expense",
+                        frequency: "monthly",
+                        startDate: dueDate,
+                        nextRunDate: addMonths(dueDate, 1),
+                        expenses: { connect: { id: expense.id } }
+                    }
+                });
+            }
 
             if (isPaid) {
                 await prisma.account.update({

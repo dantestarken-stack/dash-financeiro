@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "@/lib/prisma";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { startOfMonth, endOfMonth, addMonths, isBefore, isSameMonth } from "date-fns";
 
 export async function getDashboardData(year?: number, month?: number) {
     // 1. Setup Básico (Se o db estiver zerado, cria usuário local MOCK)
@@ -54,6 +54,9 @@ export async function getDashboardData(year?: number, month?: number) {
     }
     const firstDay = startOfMonth(baseDate);
     const lastDay = endOfMonth(baseDate);
+
+    // 2.1 Regra de Recorrência (Criação Dinâmica se não existir no mês)
+    await materializeRecurringTransactions(user.id, firstDay);
 
     // Receitas (Dentro do mes de competencia)
     const incomes = await prisma.income.findMany({
@@ -123,6 +126,7 @@ export async function getDashboardData(year?: number, month?: number) {
             status: e.status,
             nature: e.nature, // enviando nature para o client
             notes: e.notes,
+            isRecurring: e.isRecurring,
         })),
         ...incomes.map(i => ({
             id: i.id,
@@ -133,6 +137,7 @@ export async function getDashboardData(year?: number, month?: number) {
             displayDate: i.dueDate.toLocaleDateString("pt-BR"),
             status: i.status,
             notes: i.notes,
+            isRecurring: i.isRecurring,
         }))
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -173,4 +178,78 @@ export async function getDashboardData(year?: number, month?: number) {
         assets,
         liabilities,
     };
+}
+
+async function materializeRecurringTransactions(userId: string, targetMonthDate: Date) {
+    const rules = await prisma.recurringRule.findMany({
+        where: { userId, autoCreateEnabled: true },
+        include: {
+            expenses: { take: 1, orderBy: { createdAt: 'asc' } },
+            incomes: { take: 1, orderBy: { createdAt: 'asc' } }
+        }
+    });
+
+    for (const rule of rules) {
+        // Ignorar se a regra começou depois do mês alvo
+        if (isBefore(targetMonthDate, startOfMonth(rule.startDate)) && !isSameMonth(targetMonthDate, rule.startDate)) continue;
+        if (rule.endDate && isBefore(rule.endDate, targetMonthDate)) continue;
+
+        if (rule.entityType === "expense" && rule.expenses.length > 0) {
+            const exists = await prisma.expense.findFirst({
+                where: { userId, recurringRuleId: rule.id, competencyDate: targetMonthDate }
+            });
+
+            if (!exists) {
+                const template = rule.expenses[0];
+                const newDueDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), template.dueDate.getDate());
+
+                await prisma.expense.create({
+                    data: {
+                        userId,
+                        accountId: template.accountId,
+                        categoryId: template.categoryId,
+                        title: template.title,
+                        amount: template.amount,
+                        paidAmount: 0,
+                        status: "pending",
+                        paymentMethod: template.paymentMethod,
+                        nature: template.nature,
+                        purchaseDate: new Date(),
+                        dueDate: newDueDate,
+                        competencyDate: targetMonthDate,
+                        isRecurring: true,
+                        recurringRuleId: rule.id,
+                        notes: template.notes
+                    }
+                });
+            }
+        } else if (rule.entityType === "income" && rule.incomes.length > 0) {
+            const exists = await prisma.income.findFirst({
+                where: { userId, recurringRuleId: rule.id, competencyDate: targetMonthDate }
+            });
+
+            if (!exists) {
+                const template = rule.incomes[0];
+                const newDueDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), template.dueDate.getDate());
+
+                await prisma.income.create({
+                    data: {
+                        userId,
+                        accountId: template.accountId,
+                        incomeSourceId: template.incomeSourceId,
+                        title: template.title,
+                        expectedAmount: template.expectedAmount,
+                        receivedAmount: 0,
+                        type: template.type,
+                        status: "expected",
+                        dueDate: newDueDate,
+                        competencyDate: targetMonthDate,
+                        isRecurring: true,
+                        recurringRuleId: rule.id,
+                        notes: template.notes
+                    }
+                });
+            }
+        }
+    }
 }
