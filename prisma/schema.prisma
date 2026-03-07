@@ -101,6 +101,7 @@ model ExpenseCategory {
   name          String
   icon          String?
   color         String?
+  budgetLimit   Int                  @default(0)
   isDefault     Boolean              @default(false)
   isActive      Boolean              @default(true)
   createdAt     DateTime             @default(now())

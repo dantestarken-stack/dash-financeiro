@@ -16,6 +16,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
 import { createAsset, createLiability, deleteAsset, deleteLiability } from "@/actions/patrimony";
+import { createGoal, updateGoalProgress, deleteGoal, updateCategoryBudget } from "@/actions/goal";
 
 export default function DashboardClient({ data, currentMonth, currentYear }: { data: any, currentMonth: number, currentYear: number }) {
   const router = useRouter();
@@ -23,6 +24,9 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [isLiabilityModalOpen, setIsLiabilityModalOpen] = useState(false);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
 
@@ -139,6 +143,31 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
     router.refresh();
   }
 
+  async function handleSubmitGoal(e: any) {
+    e.preventDefault();
+    setIsSubmitting(true);
+    await createGoal(new FormData(e.target));
+    router.refresh();
+    setIsSubmitting(false);
+    setIsGoalModalOpen(false);
+  }
+
+  async function handleGoalDelete(id: string) {
+    if (!confirm("Remover esta meta?")) return;
+    await deleteGoal(id);
+    router.refresh();
+  }
+
+  async function handleUpdateBudget(e: any) {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(e.target);
+    await updateCategoryBudget(selectedCategoryId, formData.get("budgetLimit") as string);
+    router.refresh();
+    setIsSubmitting(false);
+    setIsBudgetModalOpen(false);
+  }
+
   return (
     <div className="flex h-screen bg-mesh text-slate-100 font-sans selection:bg-primary/30 overflow-hidden">
       <aside className="w-20 lg:w-64 bg-slate-900/40 backdrop-blur-xl border-r border-white/5 flex flex-col hidden md:flex shrink-0">
@@ -157,6 +186,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
           <NavItem icon="receipt_long" label="Despesas" active={activeTab === "expenses"} onClick={() => setActiveTab("expenses")} />
           <NavItem icon="calendar_month" label="Agenda" badge={recentTransactions.filter((r: any) => r.status === 'pending').length.toString()} active={activeTab === "agenda"} onClick={() => setActiveTab("agenda")} />
           <NavItem icon="account_balance" label="Patrimônio" active={activeTab === "patrimony"} onClick={() => setActiveTab("patrimony")} />
+          <NavItem icon="target" label="Metas & Tetos" active={activeTab === "metas"} onClick={() => setActiveTab("metas")} />
         </nav>
       </aside>
       <main className="flex-1 flex flex-col overflow-hidden">
@@ -396,6 +426,106 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                 </div>
               </div>
             )}
+
+            {activeTab === "metas" && (
+              <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div>
+                    <h2 className="text-3xl font-black text-white tracking-tight">Estratégia & Objetivos</h2>
+                    <p className="text-slate-400 text-sm font-medium mt-1">Transforme seu caixa em sonhos realizados.</p>
+                  </div>
+                  <button onClick={() => setIsGoalModalOpen(true)} className="bg-primary text-white h-12 px-6 rounded-2xl text-sm font-black uppercase tracking-widest flex items-center shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+                    <span className="material-symbols-outlined mr-2">add_task</span> Nova Meta
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2 px-2">
+                      <span className="material-symbols-outlined text-primary">emoji_events</span>
+                      Metas de Acúmulo
+                    </h3>
+                    <div className="space-y-4">
+                      {data.goals?.length === 0 ? (
+                        <div className="bg-white/5 border border-dashed border-white/10 rounded-3xl p-12 text-center text-slate-500 italic">Nenhuma meta tática definida ainda.</div>
+                      ) : data.goals.map((goal: any) => {
+                        const percent = Math.min(Math.round((goal.currentAmount / goal.targetAmount) * 100), 100);
+                        return (
+                          <div key={goal.id} className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 group">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h4 className="font-bold text-white">{goal.title}</h4>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase">Alvo: R$ {(goal.targetAmount / 100).toLocaleString('pt-BR')} • Prazo: {new Date(goal.targetDate).toLocaleDateString('pt-BR')}</p>
+                              </div>
+                              <button onClick={() => handleGoalDelete(goal.id)} className="text-slate-500 hover:text-danger opacity-0 group-hover:opacity-100 transition-all">
+                                <span className="material-symbols-outlined text-lg">delete</span>
+                              </button>
+                            </div>
+                            <div className="flex justify-between items-end mb-2">
+                              <span className={`text-sm font-black ${percent >= 100 ? 'text-success' : 'text-primary'}`}>{percent}%</span>
+                              <span className="text-xs font-bold text-slate-300">R$ {(goal.currentAmount / 100).toLocaleString('pt-BR')} / R$ {(goal.targetAmount / 100).toLocaleString('pt-BR')}</span>
+                            </div>
+                            <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden mb-4">
+                              <div className={`h-full transition-all duration-1000 ${percent >= 100 ? 'bg-success shadow-[0_0_10px_#10b981]' : 'bg-primary shadow-[0_0_10px_#135bec]'}`} style={{ width: `${percent}%` }}></div>
+                            </div>
+                            {percent < 100 && (
+                              <form onSubmit={(e: any) => {
+                                e.preventDefault();
+                                updateGoalProgress(goal.id, e.target.amount.value);
+                                e.target.reset();
+                                router.refresh();
+                              }} className="flex gap-2">
+                                <input name="amount" placeholder="Valor p/ alocar..." className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white outline-none focus:border-primary" />
+                                <button type="submit" className="bg-white/10 hover:bg-primary hover:text-white px-3 rounded-lg text-[10px] font-black uppercase transition-all">Alocar</button>
+                              </form>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2 px-2">
+                      <span className="material-symbols-outlined text-danger">rule</span>
+                      Tetos de Gastos (Monthly Budgets)
+                    </h3>
+                    <div className="space-y-4">
+                      {data.budgetStatus?.length === 0 ? (
+                        <div className="bg-white/5 border border-dashed border-white/10 rounded-3xl p-12 text-center text-slate-500 italic">Configure limites nas suas categorias de despesa.</div>
+                      ) : data.budgetStatus.map((budget: any) => (
+                        <div key={budget.id} className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 group cursor-pointer hover:border-white/10 transition-all" onClick={() => { setSelectedCategoryId(budget.id); setIsBudgetModalOpen(true); }}>
+                          <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-bold text-white flex items-center gap-2">
+                              <span className="material-symbols-outlined text-xs text-slate-500">category</span>
+                              {budget.name}
+                            </h4>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded ${budget.percent > 90 ? 'bg-danger/20 text-danger' : budget.percent > 70 ? 'bg-warning/20 text-warning' : 'bg-success/20 text-success'}`}>
+                              {budget.percent > 100 ? 'ESTOURADO' : `${Math.round(budget.percent)}%`}
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden mb-3">
+                            <div className={`h-full transition-all duration-1000 ${budget.percent > 100 ? 'bg-danger' : budget.percent > 80 ? 'bg-warning' : 'bg-primary'}`} style={{ width: `${Math.min(budget.percent, 100)}%` }}></div>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            <span>Gasto: R$ {budget.spent.toLocaleString('pt-BR')}</span>
+                            <span>Limite: R$ {budget.limit.toLocaleString('pt-BR')}</span>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="p-4 rounded-2xl bg-white/5 border border-dashed border-white/10 text-center">
+                        <select className="bg-transparent text-xs font-black uppercase text-slate-400 outline-none cursor-pointer" onChange={(e) => { if (e.target.value) { setSelectedCategoryId(e.target.value); setIsBudgetModalOpen(true); e.target.value = ""; } }}>
+                          <option value="">Definir Novo Teto em Categoria...</option>
+                          {data.expenseCategories.filter((cat: any) => !data.budgetStatus.find((b: any) => b.id === cat.id)).map((cat: any) => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <nav className="md:hidden fixed bottom-6 left-6 right-6 h-16 bg-slate-900/80 backdrop-blur-2xl border border-white/10 rounded-2xl flex items-center justify-around px-2 z-[100] shadow-2xl shadow-black">
@@ -557,6 +687,61 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
               <div className="flex items-center gap-4 pt-4">
                 <button type="button" onClick={() => setIsLiabilityModalOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:text-white transition-colors">Cancelar</button>
                 <button disabled={isSubmitting} type="submit" className="flex-[2] h-12 bg-danger text-white rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-danger/20 hover:scale-[1.02] transition-all disabled:opacity-50">{isSubmitting ? "Gravando..." : "Confirmar Passivo"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* GOAL MODAL */}
+      {isGoalModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsGoalModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-8 text-center text-primary">Novo Objetivo</h3>
+            <form onSubmit={handleSubmitGoal} className="space-y-6">
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Título da Meta</label>
+                <input required name="title" placeholder="Ex: Reserva de Emergência" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Valor Alvo (R$)</label>
+                  <input required name="targetAmount" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all font-bold" />
+                </div>
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Data Limite</label>
+                  <input required name="targetDate" type="date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+                </div>
+              </div>
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Por que isso é importante?</label>
+                <textarea name="description" rows={3} placeholder="Sua motivação aqui..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm" />
+              </div>
+              <div className="flex items-center gap-4 pt-4">
+                <button type="button" onClick={() => setIsGoalModalOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:text-white transition-colors">Cancelar</button>
+                <button disabled={isSubmitting} type="submit" className="flex-[2] h-12 bg-primary text-white rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50">{isSubmitting ? "Gravando..." : "Fixar Objetivo"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* BUDGET MODAL */}
+      {isBudgetModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsBudgetModalOpen(false)}></div>
+          <div className="relative w-full max-w-sm bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-8 text-center text-warning">Ajustar Teto</h3>
+            <p className="text-xs text-slate-400 mb-6 text-center">Defina o limite máximo de gastos mensais para a categoria de <strong>{data.expenseCategories.find((c: any) => c.id === selectedCategoryId)?.name}</strong>.</p>
+            <form onSubmit={handleUpdateBudget} className="space-y-6">
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Limite Mensal (R$)</label>
+                <input required name="budgetLimit" defaultValue={data.expenseCategories.find((c: any) => c.id === selectedCategoryId)?.budgetLimit / 100 || ""} placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-warning transition-all font-bold text-center text-xl" />
+              </div>
+              <div className="flex flex-col gap-2 pt-4">
+                <button disabled={isSubmitting} type="submit" className="h-12 bg-warning text-slate-950 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-warning/20 hover:scale-[1.02] transition-all disabled:opacity-50">Salvar Limite</button>
+                <button type="button" onClick={() => setIsBudgetModalOpen(false)} className="h-12 rounded-xl text-xs font-bold text-slate-500 hover:text-white transition-colors">Fechar</button>
               </div>
             </form>
           </div>

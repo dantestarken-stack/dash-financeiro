@@ -143,9 +143,25 @@ export async function getDashboardData(year?: number, month?: number) {
 
     const incomeSources = await prisma.incomeSource.findMany({ where: { userId: user.id } });
     const expenseCategories = await prisma.expenseCategory.findMany({ where: { userId: user.id } });
-
     const assets = await prisma.asset.findMany({ where: { userId: user.id } });
     const liabilities = await prisma.liability.findMany({ where: { userId: user.id } });
+    const goals = await prisma.goal.findMany({ where: { userId: user.id } });
+
+    // Budget Progress calculation for the month
+    const budgetStatus = expenseCategories.map(cat => {
+        const spentVal = expenses
+            .filter(e => e.categoryId === cat.id)
+            .reduce((acc, curr) => acc + curr.amount, 0);
+
+        return {
+            id: cat.id,
+            name: cat.name,
+            limit: cat.budgetLimit / 100,
+            spent: spentVal / 100,
+            percent: cat.budgetLimit > 0 ? (spentVal / cat.budgetLimit) * 100 : 0
+        };
+    }).filter(c => c.limit > 0);
+
 
     const totalAssets = assets.reduce((acc, curr) => acc + curr.amount, 0);
     const totalLiabilities = liabilities.reduce((acc, curr) => acc + curr.outstandingAmount, 0);
@@ -177,6 +193,8 @@ export async function getDashboardData(year?: number, month?: number) {
         expenseCategories,
         assets,
         liabilities,
+        goals,
+        budgetStatus,
     };
 }
 
