@@ -1,0 +1,34 @@
+# Development files
+.env.local
+.env.*.local
+dev.db
+dev.db-journal
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts (Vercel builds these)
+.next
+node_modules
+
+# Development tools
+.vscode
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Documentation
+*.md
+README.md
+
+# Testing
+.jest
+coverage
+
+# Prisma (migrations are needed, schema is not)
+prisma/dev.db
+prisma/dev.db-journal
