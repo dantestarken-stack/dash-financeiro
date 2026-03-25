@@ -15,7 +15,7 @@ export async function createGoal(formData: FormData) {
         type: formData.get("type") || "savings",
         description: formData.get("description") || "",
     });
-    if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+    if (!parsed.success) throw new Error(parsed.error.issues[0].message);
     const { title, targetAmount, targetDate, type, description } = parsed.data;
 
     const targetAmountCentavos = Math.round(targetAmount * 100);
@@ -41,7 +41,7 @@ export async function updateGoalProgress(goalId: string, amountStr: string) {
     const userId = await requireUserId();
 
     const parsed = UpdateGoalProgressSchema.safeParse({ amount: amountStr });
-    if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+    if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
     const amountCentavos = Math.round(parsed.data.amount * 100);
 
@@ -69,7 +69,7 @@ export async function updateCategoryBudget(categoryId: string, budgetStr: string
     const userId = await requireUserId();
 
     const parsed = UpdateCategoryBudgetSchema.safeParse({ budgetLimit: budgetStr });
-    if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+    if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
     const budgetLimit = Math.round(parsed.data.budgetLimit * 100);
 

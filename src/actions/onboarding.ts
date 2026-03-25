@@ -21,7 +21,7 @@ export async function completeOnboarding(formData: FormData) {
     financialPriority: formData.get("financialPriority") || "",
     savingsGoalPercentage: formData.get("savingsGoalPercentage") || 0,
   });
-  if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const { monthlyFixedIncome, financialPriority, savingsGoalPercentage } = parsed.data;
 
