@@ -2,36 +2,30 @@
 
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
-import { decrypt } from "@/lib/auth";
-
-async function getUserId() {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-    if (!token) return null;
-    const session = await decrypt(token);
-    return session.userId;
-}
+import { requireUserId } from "@/lib/session";
+import { CreateGoalSchema, UpdateGoalProgressSchema, UpdateCategoryBudgetSchema } from "@/lib/schemas";
 
 export async function createGoal(formData: FormData) {
-    const userId = await getUserId();
-    if (!userId) throw new Error("Não autorizado");
+    const userId = await requireUserId();
 
-    const title = formData.get("title") as string;
-    const amountStr = formData.get("targetAmount") as string;
-    const targetDateStr = formData.get("targetDate") as string;
-    const type = formData.get("type") as string || "savings";
-    const description = formData.get("description") as string || "";
+    const parsed = CreateGoalSchema.safeParse({
+        title: formData.get("title"),
+        targetAmount: formData.get("targetAmount"),
+        targetDate: formData.get("targetDate"),
+        type: formData.get("type") || "savings",
+        description: formData.get("description") || "",
+    });
+    if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+    const { title, targetAmount, targetDate, type, description } = parsed.data;
 
-    const cleaned = amountStr.replace(/\./g, "").replace(",", ".");
-    const targetAmount = Math.round(parseFloat(cleaned) * 100);
+    const targetAmountCentavos = Math.round(targetAmount * 100);
 
     await prisma.goal.create({
         data: {
             userId,
             title,
-            targetAmount,
-            targetDate: new Date(targetDateStr),
+            targetAmount: targetAmountCentavos,
+            targetDate: new Date(targetDate),
             startDate: new Date(),
             type,
             description,
@@ -44,11 +38,12 @@ export async function createGoal(formData: FormData) {
 }
 
 export async function updateGoalProgress(goalId: string, amountStr: string) {
-    const userId = await getUserId();
-    if (!userId) throw new Error("Não autorizado");
+    const userId = await requireUserId();
 
-    const cleaned = amountStr.replace(/\./g, "").replace(",", ".");
-    const amountCentavos = Math.round(parseFloat(cleaned) * 100);
+    const parsed = UpdateGoalProgressSchema.safeParse({ amount: amountStr });
+    if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+
+    const amountCentavos = Math.round(parsed.data.amount * 100);
 
     await prisma.goal.update({
         where: { id: goalId, userId },
@@ -60,19 +55,23 @@ export async function updateGoalProgress(goalId: string, amountStr: string) {
 }
 
 export async function deleteGoal(id: string) {
-    const userId = await getUserId();
-    if (!userId) throw new Error("Não autorizado");
-    await prisma.goal.delete({ where: { id, userId } });
+    const userId = await requireUserId();
+    // Soft delete — mantém histórico para auditorias e desfazer acidental
+    await prisma.goal.update({
+        where: { id, userId },
+        data: { deletedAt: new Date() }
+    });
     revalidatePath("/");
     return { success: true };
 }
 
 export async function updateCategoryBudget(categoryId: string, budgetStr: string) {
-    const userId = await getUserId();
-    if (!userId) throw new Error("Não autorizado");
+    const userId = await requireUserId();
 
-    const cleaned = budgetStr.replace(/\./g, "").replace(",", ".");
-    const budgetLimit = Math.round(parseFloat(cleaned) * 100);
+    const parsed = UpdateCategoryBudgetSchema.safeParse({ budgetLimit: budgetStr });
+    if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+
+    const budgetLimit = Math.round(parsed.data.budgetLimit * 100);
 
     await prisma.expenseCategory.update({
         where: { id: categoryId, userId },

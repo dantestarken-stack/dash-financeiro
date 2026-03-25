@@ -31,3 +31,6 @@ next-env.d.ts
 # prisma sqlite (local dev only)
 *.db
 *.db-journal
+
+# uploads de usuários (armazenamento local de dev — em prod usar Vercel Blob/S3)
+/public/uploads/

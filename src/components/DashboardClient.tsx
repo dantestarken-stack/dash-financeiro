@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import type { DashboardData } from "@/lib/types";
 import {
   AreaChart,
   Area,
@@ -21,7 +22,8 @@ import { logoutAction } from "@/actions/auth";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, isSameDay, isToday, addMonths, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-export default function DashboardClient({ data, currentMonth, currentYear }: { data: any, currentMonth: number, currentYear: number }) {
+export default function DashboardClient({ data, currentMonth, currentYear }: { data: DashboardData, currentMonth: number, currentYear: number }) {
+  const { kpis, recentTransactions, allTransactions, defaultAccountId, debtRecoverySourceId } = data;
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -30,10 +32,12 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedFormCategoryId, setSelectedFormCategoryId] = useState("");
+  const [selectedFormAccountId, setSelectedFormAccountId] = useState(defaultAccountId);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
 
-  const [txType, setTxType] = useState("expense");
+  const [txType, setTxType] = useState<"income" | "expense" | "debt" | "comm_receipt">("expense");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [liveTime, setLiveTime] = useState(new Date());
@@ -50,14 +54,17 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
   // Recurring logic state
   const [isRecurring, setIsRecurring] = useState(false);
 
+  // Filter states
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("");
+
   let computedAmount = "";
   if (isCommission && contractValue && commissionPct) {
     const cv = parseFloat(contractValue.replace(/\./g, "").replace(",", ".") || "0");
     const pct = parseFloat(commissionPct || "0");
     computedAmount = ((cv * pct) / 100).toLocaleString("pt-br", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-
-  const { kpis, recentTransactions, allTransactions, defaultAccountId } = data;
 
   async function handleDelete(id: string, type: "income" | "expense") {
     if (!confirm("Certeza que deseja apagar este lançamento?")) return;
@@ -97,17 +104,63 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
     return () => clearInterval(interval);
   }, []);
 
-  const chartData = [
-    { day: "01 " + new Date(currentYear, currentMonth).toLocaleDateString("pt-BR", { month: 'short' }).toUpperCase(), actual: kpis.accountBalance * 0.8, projected: kpis.accountBalance * 0.8 },
-    { day: "HOJE", actual: kpis.accountBalance, projected: kpis.accountBalance },
-    { day: new Date(currentYear, currentMonth + 1, 0).toLocaleDateString("pt-BR", { day: '2-digit', month: 'short' }).toUpperCase(), actual: null, projected: kpis.projectedBalance },
-  ];
+  // Gráfico de Trajetória de Caixa — fluxo acumulado real por dia do mês
+  const chartData = (() => {
+    const today = new Date();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const isCurrentMonth = today.getFullYear() === currentYear && today.getMonth() === currentMonth;
+    const lastRealDay = isCurrentMonth ? today.getDate() : daysInMonth;
+
+    // Saldo inicial: saldo atual menos o fluxo confirmado do mês
+    const totalReceivedThisMonth = allTransactions
+      .filter((t: any) => t.type === 'income' && t.status === 'received')
+      .reduce((acc: number, t: any) => acc + t.amount, 0);
+    const totalPaidThisMonth = allTransactions
+      .filter((t: any) => t.type === 'expense' && t.status === 'paid')
+      .reduce((acc: number, t: any) => acc + Math.abs(t.amount), 0);
+    const startBalance = kpis.accountBalance - totalReceivedThisMonth + totalPaidThisMonth;
+
+    const points: { day: string; actual: number | null; projected: number | null }[] = [];
+    let runningBalance = startBalance;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayTx = allTransactions.filter((t: any) => t.date.startsWith(dateStr));
+
+      dayTx.forEach((t: any) => {
+        if (t.type === 'income' && t.status === 'received') runningBalance += t.amount;
+        if (t.type === 'expense' && t.status === 'paid') runningBalance -= Math.abs(t.amount);
+      });
+
+      const shortMonth = new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase();
+      const label = d === 1 ? `01 ${shortMonth}` :
+                   (isCurrentMonth && d === lastRealDay) ? 'HOJE' :
+                   (!isCurrentMonth && d === daysInMonth) ? `${String(d).padStart(2,'0')} ${shortMonth}` :
+                   d % 7 === 0 ? String(d) : '';
+
+      const isReal = d <= lastRealDay;
+      const pendingUntilDay = allTransactions
+        .filter((t: any) => {
+          const txDay = parseInt(t.date.substring(8, 10));
+          return txDay <= d && (t.status === 'pending' || t.status === 'expected');
+        })
+        .reduce((acc: number, t: any) => acc + t.amount, 0);
+
+      points.push({
+        day: label,
+        actual: isReal ? parseFloat(runningBalance.toFixed(2)) : null,
+        projected: !isReal ? parseFloat((kpis.accountBalance + pendingUntilDay).toFixed(2)) : null,
+      });
+    }
+
+    return points.filter(p => p.day !== '');
+  })();
+
 
   async function handleSubmit(e: any) {
     e.preventDefault();
     setIsSubmitting(true);
     const formData = new FormData(e.target);
-    formData.append("accountId", defaultAccountId);
     await createTransaction(formData);
     router.refresh();
     setIsSubmitting(false);
@@ -222,9 +275,29 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="relative hidden sm:block">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
-              <input className="pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm w-48 lg:w-64 focus:ring-2 focus:ring-primary h-10 outline-none transition-all" placeholder="Buscar transação..." type="text" />
+            <div className="hidden sm:flex items-center gap-3">
+              {(globalSearch || statusFilter !== "all" || categoryFilter) && (
+                <button 
+                  onClick={() => {
+                    setGlobalSearch("");
+                    setStatusFilter("all");
+                    setCategoryFilter("");
+                  }}
+                  className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-lg border border-primary/20 hover:bg-primary/20 transition-all whitespace-nowrap"
+                >
+                  Limpar Filtros
+                </button>
+              )}
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-lg">search</span>
+                <input
+                  className="pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm w-48 lg:w-64 focus:ring-2 focus:ring-primary h-10 outline-none transition-all"
+                  placeholder="Buscar transação..."
+                  type="text"
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                />
+              </div>
             </div>
             <button onClick={() => setIsModalOpen(true)} className="bg-primary hover:bg-primary/90 text-white h-10 px-4 rounded-xl text-sm font-bold flex items-center shadow-lg shadow-primary/20 transition-all active:scale-95">
               <span className="material-symbols-outlined mr-2">add</span> Lançamento
@@ -239,25 +312,153 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                   <h2 className="text-3xl font-black text-white tracking-tight">Olá, {data.user?.name || "Comandante"}</h2>
                   <p className="text-slate-400 text-sm font-medium">Sua inteligência financeira para {new Date(currentYear, currentMonth).toLocaleDateString("pt-BR", { month: 'long' })} está atualizada.</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <KpiCard title="Saldo Atual" value={`R$ ${kpis.accountBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="+2.4%" trendUp={true} icon="account_balance" color="primary" />
-                  <KpiCard title="Receita Confirmada" value={`R$ ${kpis.actualIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend={`Falta R$ ${kpis.remainingIncome}`} trendUp={true} icon="trending_up" color="success" />
-                  <KpiCard title="Despesa Efetiva" value={`R$ ${kpis.paidExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend={`Pendente R$ ${kpis.pendingExpense}`} trendUp={false} icon="payments" color="danger" />
-                  <KpiCard title="Saldo Projetado" value={`R$ ${kpis.projectedBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} trend="Projeção final" icon="query_stats" color="warning" />
+                {/* ═══════ SEÇÃO 1: SITUAÇÃO HOJE ═══════ */}
+                <div className="space-y-2">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 ml-1">📍 Situação Atual</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <KpiCard 
+                      title="Dinheiro no Banco" 
+                      titleTooltip="Seu saldo real na conta hoje"
+                      value={`R$ ${kpis.accountBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                      trend="Saldo atual em conta" 
+                      icon="account_balance" 
+                      color="primary" 
+                      onClick={() => {
+                        setActiveTab("agenda");
+                        setStatusFilter("all");
+                        setGlobalSearch("");
+                      }}
+                    />
+                    <KpiCard 
+                      title="Falta da Empresa" 
+                      titleTooltip="Diferença entre seu salário e os custos fixos já pagos"
+                      value={`R$ ${kpis.estimatedFreeBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                      trend="Salário − Fixos = Saldo Livre" 
+                      icon="business_center" 
+                      color="warning" 
+                    />
+                    <KpiCard 
+                      title="Projeção Final" 
+                      titleTooltip="Saldo Hoje + Tudo que falta entrar − Tudo que falta pagar"
+                      value={`R$ ${kpis.projectedBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
+                      trend="Se receber tudo e pagar tudo" 
+                      icon="query_stats" 
+                      color={kpis.projectedBalance >= 0 ? "success" : "danger"}
+                      onClick={() => {
+                        setActiveTab("agenda");
+                        setStatusFilter("pending");
+                        setGlobalSearch("");
+                      }}
+                    />
+                  </div>
                 </div>
-                {kpis.pendingCommissions > 0 && (
-                  <div className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 to-slate-900 border border-primary/20 p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all hover:border-primary/40 shadow-2xl">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 blur-[100px] -z-10 group-hover:bg-primary/30 transition-colors"></div>
-                    <div>
-                      <h2 className="text-2xl font-black text-white flex items-center tracking-tight"><span className="material-symbols-outlined text-primary text-3xl mr-3">target</span>Comissões no Radar</h2>
-                      <p className="text-slate-400 text-sm mt-2 max-w-md font-medium">Você tem valores significativos para liquidar este mês. Mantenha o foco na execução.</p>
+
+                {/* ═══════ SEÇÃO 2: FLUXO DO MÊS ═══════ */}
+                <div className="space-y-2">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 ml-1">💸 Fluxo do Mês</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* ENTRADAS */}
+                    <div 
+                      onClick={() => { setActiveTab("incomes"); setStatusFilter("all"); setGlobalSearch(""); }}
+                      className="relative group overflow-hidden bg-gradient-to-br from-emerald-500/10 to-slate-900/80 backdrop-blur-xl border border-emerald-500/20 rounded-[2rem] p-6 shadow-2xl cursor-pointer hover:border-emerald-500/40 transition-all active:scale-[0.99]"
+                    >
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-bl-full -z-10"></div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Entradas do Mês</h3>
+                        <div className="p-2.5 rounded-xl bg-emerald-500/20"><span className="material-symbols-outlined text-xl text-emerald-500">trending_up</span></div>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-[9px] font-bold uppercase tracking-widest text-emerald-500/70">Já Recebido</div>
+                          <div className="text-2xl font-black text-white">R$ {kpis.actualIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div className="text-[9px] text-slate-500 font-medium">Salário + adiantamentos já no banco</div>
+                        </div>
+                        <div className="border-t border-white/5 pt-3">
+                          <div className="text-[9px] font-bold uppercase tracking-widest text-amber-500/70">Falta Receber</div>
+                          <div className="text-lg font-black text-amber-400">R$ {kpis.remainingIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div className="text-[9px] text-slate-500 font-medium">Comissões + dívidas pendentes</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-2xl px-8 py-4 backdrop-blur-md">
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Total em Aberto</span>
-                      <div className="text-4xl font-black text-white mt-1">R$ {kpis.pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+
+                    {/* SAÍDAS */}
+                    <div 
+                      onClick={() => { setActiveTab("expenses"); setStatusFilter("all"); setGlobalSearch(""); }}
+                      className="relative group overflow-hidden bg-gradient-to-br from-rose-500/10 to-slate-900/80 backdrop-blur-xl border border-rose-500/20 rounded-[2rem] p-6 shadow-2xl cursor-pointer hover:border-rose-500/40 transition-all active:scale-[0.99]"
+                    >
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-bl-full -z-10"></div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">Saídas do Mês</h3>
+                        <div className="p-2.5 rounded-xl bg-rose-500/20"><span className="material-symbols-outlined text-xl text-rose-500">trending_down</span></div>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-[9px] font-bold uppercase tracking-widest text-rose-500/70">Já Pago</div>
+                          <div className="text-2xl font-black text-white">R$ {kpis.paidExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div className="text-[9px] text-slate-500 font-medium">Aluguel, condomínio, energia, gastos diversos</div>
+                        </div>
+                        {kpis.pendingExpense > 0 && (
+                          <div className="border-t border-white/5 pt-3">
+                            <div className="text-[9px] font-bold uppercase tracking-widest text-rose-400/70">Ainda Pendente</div>
+                            <div className="text-lg font-black text-rose-400">R$ {kpis.pendingExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                            <div className="text-[9px] text-slate-500 font-medium">Contas ainda não quitadas</div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
+
+                {/* ═══════ SEÇÃO 3: COMISSÕES ═══════ */}
+                <div className="space-y-2">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 ml-1">🎯 Comissões</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {kpis.pendingCommissions > 0 && (
+                      <div 
+                        onClick={() => {
+                          setActiveTab("incomes");
+                          setGlobalSearch("Comiss");
+                          setStatusFilter("all");
+                        }}
+                        className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 to-slate-900 border border-primary/20 p-8 flex flex-col justify-between gap-6 transition-all hover:border-primary/40 shadow-2xl cursor-pointer active:scale-[0.99]"
+                      >
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 blur-[100px] -z-10 group-hover:bg-primary/30 transition-colors"></div>
+                        <div>
+                          <h2 className="text-2xl font-black text-white flex items-center tracking-tight"><span className="material-symbols-outlined text-primary text-3xl mr-3">target</span>Comissões no Radar</h2>
+                          <p className="text-slate-400 text-sm mt-2 max-w-md font-medium">Total de comissões que você tem a receber de todos os clientes.</p>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-4 backdrop-blur-md self-start">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">A Receber Total</span>
+                          <div className="text-3xl font-black text-white mt-1">R$ {kpis.pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div 
+                      onClick={() => {
+                        setTxType("comm_receipt");
+                        setIsModalOpen(true);
+                      }}
+                      className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500/20 to-slate-900 border border-emerald-500/20 p-8 flex flex-col justify-between gap-6 transition-all hover:border-emerald-500/40 shadow-2xl cursor-pointer active:scale-[0.99]"
+                    >
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px] -z-10 group-hover:bg-emerald-500/20 transition-colors"></div>
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <h2 className="text-2xl font-black text-white flex items-center tracking-tight"><span className="material-symbols-outlined text-emerald-500 text-3xl mr-3">check_circle</span>Comissões Recebidas</h2>
+                          <button className="bg-emerald-500 text-white p-2 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/20">
+                            <span className="material-symbols-outlined">add_circle</span>
+                          </button>
+                        </div>
+                        <p className="text-slate-400 text-sm mt-2 max-w-md font-medium">Clique para lançar novos recebimentos de comissão.</p>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-4 backdrop-blur-md self-start">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500">Recebido no Mês</span>
+                        <div className="text-3xl font-black text-white mt-1">R$ {(kpis.receivedCommissionsThisMonth || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-8 shadow-xl">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-10"><span className="material-symbols-outlined text-primary">distance</span>Trajetória de Caixa</h3>
@@ -334,7 +535,12 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     {recentTransactions.length === 0 ? <div className="text-sm text-slate-500 text-center py-20 italic">Centro sem comando.</div> : recentTransactions.map((t: any) => (
                       <div key={t.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group">
                         <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${t.type === 'income' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}><span className="material-symbols-outlined text-xl">{t.type === 'income' ? 'add' : 'remove'}</span></div>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            t.isDebtRecovery ? 'bg-primary/10 text-primary' :
+                            t.type === 'income' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+                          }`}>
+                            <span className="material-symbols-outlined text-xl">{t.isDebtRecovery ? 'handshake' : t.type === 'income' ? 'add' : 'remove'}</span>
+                          </div>
                           <div className="max-w-[200px]"><p className="text-sm font-bold text-white truncate">{t.name}</p><p className="text-[10px] text-slate-500 font-bold uppercase">{t.displayDate}</p></div>
                         </div>
                         <p className={`text-sm font-black ${t.type === 'income' ? 'text-success' : 'text-white'}`}>{t.type === 'income' ? '+' : '-'} {Math.abs(t.amount).toLocaleString('pt-BR')}</p>
@@ -346,14 +552,95 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
             )}
             {(activeTab === "incomes" || activeTab === "expenses") && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                <h2 className="text-2xl font-black text-white uppercase tracking-tight">{activeTab === "incomes" ? "Portfólio de Receitas" : "Centro de Despesas"}</h2>
-                <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
-                  <div className="p-8 space-y-4">
-                    {allTransactions.filter((t: any) => t.type === (activeTab === "incomes" ? "income" : "expense")).length === 0 ? <div className="py-20 text-center text-slate-500 font-medium">Nenhum registro tático encontrado.</div> : allTransactions.filter((t: any) => t.type === (activeTab === "incomes" ? "income" : "expense")).map((t: any) => (
-                      <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
-                    ))}
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                  <h2 className="text-2xl font-black text-white uppercase tracking-tight">{activeTab === "incomes" ? "Portfólio de Receitas" : "Centro de Despesas"}</h2>
+                  <div className="flex gap-2 flex-wrap">
+                    <select
+                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs font-bold text-slate-300 outline-none focus:border-primary"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="all">Todos os Status</option>
+                      {activeTab === "incomes" ? (
+                        <>
+                          <option value="expected">Pendente</option>
+                          <option value="received">Recebido</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="pending">Pendente</option>
+                          <option value="paid">Pago</option>
+                        </>
+                      )}
+                    </select>
+                    <select
+                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs font-bold text-slate-300 outline-none focus:border-primary"
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                    >
+                      <option value="">Todos os Tipos / Categorias</option>
+                      {activeTab === "incomes"
+                        ? data.incomeSources.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)
+                        : (
+                          <>
+                            <optgroup label="Categorias">
+                              {data.expenseCategories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </optgroup>
+                            <optgroup label="Natureza">
+                              <option value="essential">Essencial</option>
+                              <option value="important">Importante</option>
+                              <option value="superfluous">Supérfluo</option>
+                            </optgroup>
+                          </>
+                        )
+                      }
+                    </select>
                   </div>
                 </div>
+                <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
+                  <div className="p-8 space-y-4">
+                    {(() => {
+                      const filtered = allTransactions.filter((t: any) => {
+                        const matchesType = t.type === (activeTab === "incomes" ? "income" : "expense");
+                        const matchesSearch = !globalSearch || t.name.toLowerCase().includes(globalSearch.toLowerCase()) || (t.notes && t.notes.toLowerCase().includes(globalSearch.toLowerCase()));
+                        const matchesCategory = !categoryFilter || t.categoryId === categoryFilter || t.incomeSourceId === categoryFilter || t.nature === categoryFilter;
+                        const matchesStatus = statusFilter === "all" || t.status === statusFilter;
+                        return matchesType && matchesSearch && matchesCategory && matchesStatus;
+                      });
+
+                      if (filtered.length === 0) return <div className="py-20 text-center text-slate-500 font-medium">Nenhum registro tático encontrado para este filtro.</div>;
+
+                      return filtered.map((t: any) => (
+                        <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                      ));
+                    })()}
+                  </div>
+                </div>
+                {activeTab === "incomes" && data.futureCommissions?.length > 0 && (
+                  <div className="animate-in fade-in slide-in-from-top-4 space-y-6 pt-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-primary/10 border border-primary/20">
+                        <span className="material-symbols-outlined text-primary text-xl">radar</span>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-white tracking-tight">Radar de Comissões Futuras</h3>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Projeção estimada de recebimentos para os próximos meses</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {data.futureCommissions.map((fc: any, i: number) => (
+                        <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/[0.08] transition-all group overflow-hidden relative">
+                          <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 truncate">{fc.label}</p>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-xs font-bold text-slate-400">R$</span>
+                            <span className="text-xl font-black text-white">{fc.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -389,8 +676,9 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                       const endDate = endOfWeek(monthEnd);
                       const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
 
-                      return calendarDays.map((day, idx) => {
-                        const dayTx = allTransactions.filter((t: any) => isSameDay(new Date(t.date), day));
+                        return calendarDays.map((day, idx) => {
+                          const dateStr = format(day, "yyyy-MM-dd");
+                          const dayTx = allTransactions.filter((t: any) => t.date.startsWith(dateStr));
                         const isSelectedMonth = isSameMonth(day, monthStart);
                         const isCurrentDay = isToday(day);
 
@@ -625,6 +913,8 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
           <MobileNavItem icon="payments" active={activeTab === "incomes"} onClick={() => setActiveTab("incomes")} />
           <MobileNavItem icon="receipt_long" active={activeTab === "expenses"} onClick={() => setActiveTab("expenses")} />
           <MobileNavItem icon="calendar_month" active={activeTab === "agenda"} onClick={() => setActiveTab("agenda")} />
+          <MobileNavItem icon="account_balance" active={activeTab === "patrimony"} onClick={() => setActiveTab("patrimony")} />
+          <MobileNavItem icon="target" active={activeTab === "metas"} onClick={() => setActiveTab("metas")} />
         </nav>
       </main>
       {isModalOpen && (
@@ -636,15 +926,47 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
               <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white transition-colors"><span className="material-symbols-outlined">close</span></button>
             </div>
             <form onSubmit={handleSubmit} className="p-0 space-y-6">
-              <div className="grid grid-cols-2 gap-2 bg-white/5 p-1 rounded-xl">
-                <button type="button" onClick={() => setTxType("income")} className={`py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${txType === 'income' ? 'bg-primary text-white' : 'text-slate-500 hover:text-white'}`}>Receita</button>
-                <button type="button" onClick={() => setTxType("expense")} className={`py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${txType === 'expense' ? 'bg-primary text-white' : 'text-slate-500 hover:text-white'}`}>Despesa</button>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 bg-white/5 p-1 rounded-xl">
+                <button type="button" onClick={() => setTxType("income")} className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${txType === 'income' ? 'bg-success text-white shadow-lg shadow-success/20' : 'text-slate-500 hover:text-white'}`}>Receita</button>
+                <button type="button" onClick={() => setTxType("comm_receipt")} className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all leading-tight ${txType === "comm_receipt" ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-slate-500 hover:text-white"}`}>Receb. Comis.</button>
+                <button type="button" onClick={() => setTxType("debt")} className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all leading-tight ${txType === 'debt' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-500 hover:text-white'}`}>Receb. Dívida</button>
+                <button type="button" onClick={() => setTxType("expense")} className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${txType === 'expense' ? 'bg-danger text-white shadow-lg shadow-danger/20' : 'text-slate-500 hover:text-white'}`}>Despesa</button>
               </div>
-              <input type="hidden" name="type" value={txType} />
+              {/* Quando for dívida ou recebimento de comissão, enviamos type=income ao backend */}
+              <input type="hidden" name="type" value={(txType === 'debt' || txType === 'comm_receipt') ? 'income' : txType} />
+              <input type="hidden" name="isCommissionReceipt" value={txType === 'comm_receipt' ? 'true' : 'false'} />
               <div className="space-y-4">
                 <div className="group">
                   <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Descrição</label>
-                  <input required name="title" list="suggestions" placeholder="Ex: Venda de Consultoria, Aluguel..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+                  <input
+                    required
+                    name="title"
+                    list="suggestions"
+                    defaultValue={txType === 'comm_receipt' ? 'Recebimento de Comissão' : ''}
+                    placeholder="Ex: Aluguel, Supermercado, Netflix..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all"
+                    onChange={(e) => {
+                      const val = e.target.value.toLowerCase();
+                      if (txType === "expense") {
+                        // Se o usuário digitar algo que bate com uma subcategoria, seleciona a categoria automaticamente
+                        const matchedCat = data.expenseCategories.find((c: any) =>
+                          c.subcategories.some((s: any) => s.name.toLowerCase() === val)
+                        );
+                        if (matchedCat) {
+                          setSelectedFormCategoryId(matchedCat.id);
+                        }
+                      }
+                    }}
+                  />
+                  <datalist id="suggestions">
+                    {txType === "income"
+                      ? data.incomeSources.map((s: any) => <option key={s.id} value={s.name} />)
+                      : (selectedFormCategoryId
+                        ? data.expenseCategories.find((c: any) => c.id === selectedFormCategoryId)?.subcategories.map((s: any) => <option key={s.id} value={s.name} />)
+                        : data.expenseCategories.flatMap((c: any) => c.subcategories).map((s: any) => <option key={s.id} value={s.name} />)
+                      )
+                    }
+                  </datalist>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="group">
@@ -656,6 +978,78 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     <input required name="dueDate" type="date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
                   </div>
                 </div>
+
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Conta de Origem / Destino</label>
+                  <select 
+                    required 
+                    name="accountId" 
+                    value={selectedFormAccountId}
+                    onChange={(e) => setSelectedFormAccountId(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm"
+                  >
+                    {data.accounts?.map((a: any) => (
+                      <option key={a.id} value={a.id}>{a.name} (R$ {a.balance.toLocaleString('pt-BR')})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {txType === "expense" ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="group">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Categoria</label>
+                      <select
+                        required
+                        name="categoryId"
+                        value={selectedFormCategoryId}
+                        onChange={(e) => setSelectedFormCategoryId(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm"
+                      >
+                        <option value="">Selecione...</option>
+                        {data.expenseCategories.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="group">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Natureza</label>
+                      <select required name="nature" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm">
+                        <option value="essential">Essencial</option>
+                        <option value="important">Importante</option>
+                        <option value="superfluous">Supérfluo</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : txType === 'debt' ? (
+                  <div className="space-y-4">
+                    {/* Campo oculto: seleciona automaticamente a fonte 'Recebimento de Dívida' */}
+                    <input type="hidden" name="incomeSourceId" value={debtRecoverySourceId} />
+                    <div className="group">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Nome do Devedor (Quem me pagou?)</label>
+                      <input
+                        name="notes"
+                        placeholder="Ex: João Silva, Carlos..."
+                        className="w-full bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 border border-primary/20 rounded-xl">
+                      <span className="material-symbols-outlined text-primary text-sm">info</span>
+                      <p className="text-[10px] text-primary font-bold">Este recebimento aparecerá em Receitas do mês selecionado.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="group">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Fonte da Receita</label>
+                      <select required name="incomeSourceId" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm">
+                        <option value="">Selecione...</option>
+                        {data.incomeSources.filter((s: any) => s.name !== 'Recebimento de Dívida').map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
                 {txType === "expense" && (
                   <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-4">
                     <div className="flex items-center justify-between">
@@ -684,13 +1078,27 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     </div>
                     {isCommission && (
                       <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
-                        <input placeholder="Valor Venda" value={contractValue} onChange={(e) => setContractValue(e.target.value)} className="bg-white/10 border-none rounded-lg p-2 text-xs text-white" />
-                        <select value={commissionPct} onChange={(e) => setCommissionPct(e.target.value)} className="bg-white/10 border-none rounded-lg p-2 text-xs text-white"><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option></select>
+                        <div>
+                          <label className="block text-[8px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Valor Venda (Contrato)</label>
+                          <input placeholder="Valor Venda" value={contractValue} onChange={(e) => setContractValue(e.target.value)} className="w-full bg-white/10 border-none rounded-lg p-2 text-xs text-white" />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">% Comissão</label>
+                          <select value={commissionPct} onChange={(e) => setCommissionPct(e.target.value)} className="w-full bg-white/10 border-none rounded-lg p-2 text-xs text-white"><option value="10">10%</option><option value="20">20%</option><option value="30">30%</option></select>
+                        </div>
+                        <div className="col-span-2 mt-2">
+                          <label className="block text-[8px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Abatimento / Antecipação (R$)</label>
+                          <input name="abatement" placeholder="Ex: 330,00" className="w-full bg-primary/20 border border-primary/30 rounded-lg p-2 text-xs text-white placeholder-primary/50" />
+                          <p className="text-[8px] text-slate-500 mt-1">* Valor já recebido antecipadamente que abate do total.</p>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
-                <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Notas / Cliente</label><textarea name="notes" rows={2} placeholder="Identifique o cliente..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm" /></div>
+                {/* Campo de notas só aparece manualmente quando não é dívida (para dívida, usamos o campo acima) */}
+                {txType !== 'debt' && (
+                  <div><label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Notas / Cliente</label><textarea name="notes" rows={2} placeholder="Identifique o cliente..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm" /></div>
+                )}
 
                 <div className="group">
                   <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Anexar Comprovante / PDF</label>
@@ -703,7 +1111,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
 
                 <div className="flex items-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
                   <input type="checkbox" name="isPaid" value="true" id="isPaid" className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" />
-                  <label htmlFor="isPaid" className="text-sm font-bold text-slate-300">Marcar como {txType === 'income' ? 'Recebido' : 'Pago'} agora {isInstallment ? '(Apenas 1ª parcela)' : ''}</label>
+                  <label htmlFor="isPaid" className="text-sm font-bold text-slate-300">Marcar como {txType === 'expense' ? 'Pago' : 'Recebido'} agora {isInstallment ? '(Apenas 1ª parcela)' : ''}</label>
                 </div>
               </div>
               <div className="flex items-center gap-4 pt-4">
@@ -855,9 +1263,19 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
 
 function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete }: any) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group relative overflow-hidden">
+    <div
+      className="transaction-row flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group relative overflow-hidden"
+      data-category={t.categoryId}
+      data-source={t.incomeSourceId}
+      data-nature={t.nature}
+    >
       <div className="flex items-center gap-6">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${t.type === "income" ? "bg-success/10 text-success shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "bg-danger/10 text-danger shadow-[0_0_20px_rgba(244,63,94,0.1)]"}`}><span className="material-symbols-outlined text-2xl">{t.type === "income" ? "arrow_downward" : "arrow_upward"}</span></div>
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${
+          t.isDebtRecovery ? 'bg-primary/10 text-primary shadow-[0_0_20px_rgba(19,91,236,0.1)]' :
+          t.type === "income" ? "bg-success/10 text-success shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "bg-danger/10 text-danger shadow-[0_0_20px_rgba(244,63,94,0.1)]"
+        }`}>
+          <span className="material-symbols-outlined text-2xl">{t.isDebtRecovery ? 'handshake' : t.type === "income" ? "arrow_downward" : "arrow_upward"}</span>
+        </div>
         <div>
           <h4 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
             {t.name}
@@ -899,13 +1317,19 @@ function MobileNavItem({ icon, active, onClick }: any) {
   );
 }
 
-function KpiCard({ title, value, trend, trendUp, icon, color }: any) {
+function KpiCard({ title, value, trend, trendUp, icon, color, onClick, titleTooltip }: any) {
   const colors: any = { primary: "from-primary/20 to-primary/5 text-primary border-primary/20 shadow-primary/5", success: "from-success/20 to-success/5 text-success border-success/20 shadow-success/5", danger: "from-danger/20 to-danger/5 text-danger border-danger/20 shadow-danger/5", warning: "from-warning/20 to-warning/5 text-warning border-warning/20 shadow-warning/5" };
   return (
-    <div className={`relative overflow-hidden bg-gradient-to-br ${colors[color]} backdrop-blur-xl border rounded-[2rem] p-6 shadow-2xl transition-all hover:scale-[1.02] hover:border-white/20 group`}>
+    <div 
+      onClick={onClick}
+      className={`relative overflow-hidden bg-gradient-to-br ${colors[color]} backdrop-blur-xl border rounded-[2rem] p-6 shadow-2xl transition-all ${onClick ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98] hover:border-white/20' : ''} group`}
+    >
       <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
       <div className="flex justify-between items-start mb-6">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{title}</h3>
+        <div className="flex flex-col">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">{title}</h3>
+          {titleTooltip && <span className="text-[8px] text-white/30 font-bold mt-0.5 tracking-tight uppercase leading-none">{titleTooltip}</span>}
+        </div>
         <div className={`p-2.5 rounded-xl bg-white/10 backdrop-blur-md`}><span className="material-symbols-outlined text-xl">{icon}</span></div>
       </div>
       <div><div className="text-2xl font-black text-white tracking-tighter mb-2 truncate">{value}</div><div className="flex items-center justify-between"><div className={`text-[10px] font-black px-2 py-0.5 rounded bg-white/5 ${trendUp ? 'text-success' : 'text-danger'}`}>{trend}</div></div></div>
