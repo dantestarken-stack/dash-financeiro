@@ -13,10 +13,15 @@ import {
   PieChart,
   Pie,
   Cell,
+  BarChart,
+  Bar,
+  Legend,
 } from "recharts";
+import { getReportData, type ReportData } from "@/actions/reports";
 import { useRouter } from "next/navigation";
 import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
 import { createAsset, createLiability, deleteAsset, deleteLiability } from "@/actions/patrimony";
+import { createCard, deleteCard } from "@/actions/cards";
 import { createGoal, updateGoalProgress, deleteGoal, updateCategoryBudget } from "@/actions/goal";
 import { logoutAction } from "@/actions/auth";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, isSameDay, isToday, addMonths, isSameMonth } from "date-fns";
@@ -58,6 +63,38 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
   const [globalSearch, setGlobalSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("");
+
+  // Card states
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+
+  async function handleCreateCard(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setIsSubmitting(true);
+    await createCard(new FormData(e.currentTarget));
+    setIsCardModalOpen(false);
+    setIsSubmitting(false);
+    router.refresh();
+  }
+
+  async function handleDeleteCard(id: string) {
+    if (!confirm("Deseja remover este cartão?")) return;
+    await deleteCard(id);
+    router.refresh();
+  }
+
+  // Report states
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+
+  async function loadReportData() {
+    if (reportData) return;
+    setIsLoadingReport(true);
+    try {
+      const data = await getReportData(12);
+      setReportData(data);
+    } catch (e) { console.error(e); }
+    setIsLoadingReport(false);
+  }
 
   let computedAmount = "";
   if (isCommission && contractValue && commissionPct) {
@@ -243,6 +280,8 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
           <NavItem icon="calendar_month" label="Agenda" badge={recentTransactions.filter((r: any) => r.status === 'pending').length.toString()} active={activeTab === "agenda"} onClick={() => setActiveTab("agenda")} />
           <NavItem icon="account_balance" label="Patrimônio" active={activeTab === "patrimony"} onClick={() => setActiveTab("patrimony")} />
           <NavItem icon="target" label="Metas & Tetos" active={activeTab === "metas"} onClick={() => setActiveTab("metas")} />
+          <NavItem icon="credit_card" label="Cartões" active={activeTab === "cards"} onClick={() => setActiveTab("cards")} />
+          <NavItem icon="bar_chart" label="Relatórios" active={activeTab === "reports"} onClick={() => { setActiveTab("reports"); loadReportData(); }} />
         </nav>
         <div className="p-4 border-t border-white/5 space-y-2">
           <div className="px-4 py-2 flex items-center gap-3">
@@ -252,6 +291,10 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
               <p className="text-[8px] font-bold text-slate-500 truncate">{data.user?.email}</p>
             </div>
           </div>
+          <button onClick={() => router.push("/settings")} className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-xs font-bold text-slate-500 hover:text-white hover:bg-white/5 transition-all group">
+            <span className="material-symbols-outlined text-sm">settings</span>
+            <span className="hidden lg:block uppercase tracking-widest font-black">Configurações</span>
+          </button>
           <button onClick={() => logoutAction()} className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-xs font-bold text-slate-500 hover:text-danger hover:bg-danger/10 transition-all group">
             <span className="material-symbols-outlined text-sm group-hover:text-danger">logout</span>
             <span className="hidden lg:block uppercase tracking-widest font-black">Encerrar Sessão</span>
@@ -906,6 +949,244 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                 </div>
               </div>
             )}
+
+            {/* ── CARTÕES ────────────────────────────────────────────────── */}
+            {activeTab === "cards" && (
+              <div className="space-y-6 pb-32 md:pb-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Cartões de Crédito</h2>
+                    <p className="text-slate-500 text-sm mt-1">{data.cards.length} cartão(ões) cadastrado(s)</p>
+                  </div>
+                  <button onClick={() => setIsCardModalOpen(true)} className="flex items-center gap-2 h-10 px-5 bg-primary rounded-xl text-xs font-black uppercase tracking-widest text-white hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+                    <span className="material-symbols-outlined text-sm">add</span>
+                    <span className="hidden sm:block">Novo Cartão</span>
+                  </button>
+                </div>
+
+                {data.cards.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <span className="material-symbols-outlined text-5xl text-slate-700 mb-4">credit_card</span>
+                    <p className="text-slate-400 font-bold">Nenhum cartão cadastrado.</p>
+                    <p className="text-slate-600 text-sm mt-1">Adicione seus cartões para associar despesas a eles.</p>
+                    <button onClick={() => setIsCardModalOpen(true)} className="mt-6 px-6 py-3 bg-primary rounded-xl text-xs font-black uppercase tracking-widest text-white hover:opacity-90 transition-all">
+                      Adicionar Cartão
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {data.cards.map((card: any) => (
+                      <div key={card.id} className="relative bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 rounded-3xl p-6 overflow-hidden group">
+                        {/* Decorative circle */}
+                        <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-primary/10 pointer-events-none" />
+                        <div className="absolute -bottom-8 -left-8 w-40 h-40 rounded-full bg-white/3 pointer-events-none" />
+
+                        <div className="relative">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{card.brand}</p>
+                              <h3 className="text-lg font-black text-white mt-0.5">{card.name}</h3>
+                            </div>
+                            <span className="material-symbols-outlined text-3xl text-primary/60">credit_card</span>
+                          </div>
+
+                          <div className="space-y-2 mb-5">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-500 font-bold uppercase tracking-widest">Limite</span>
+                              <span className="text-white font-black">R$ {card.limitAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-500 font-bold uppercase tracking-widest">Fechamento</span>
+                              <span className="text-white font-black">Dia {card.closingDay}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-slate-500 font-bold uppercase tracking-widest">Vencimento</span>
+                              <span className="text-white font-black">Dia {card.dueDay}</span>
+                            </div>
+                            {card.accountName && (
+                              <div className="flex justify-between text-xs">
+                                <span className="text-slate-500 font-bold uppercase tracking-widest">Conta</span>
+                                <span className="text-primary font-black">{card.accountName}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => handleDeleteCard(card.id)}
+                            className="w-full py-2 rounded-xl bg-white/5 hover:bg-danger/10 hover:text-danger text-slate-500 text-xs font-black uppercase tracking-widest transition-all border border-white/5 hover:border-danger/20"
+                          >
+                            Remover Cartão
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── RELATÓRIOS ─────────────────────────────────────────────── */}
+            {activeTab === "reports" && (
+              <div className="space-y-8 pb-32 md:pb-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tight">Relatórios & Insights</h2>
+                    <p className="text-slate-500 text-sm mt-1">Análise dos últimos 12 meses</p>
+                  </div>
+                </div>
+
+                {isLoadingReport && (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="text-center">
+                      <span className="material-symbols-outlined text-5xl text-primary animate-pulse">bar_chart</span>
+                      <p className="text-slate-400 mt-4 font-bold">Carregando seus dados...</p>
+                    </div>
+                  </div>
+                )}
+
+                {!isLoadingReport && !reportData && (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="text-center">
+                      <span className="material-symbols-outlined text-5xl text-slate-600">bar_chart</span>
+                      <p className="text-slate-400 mt-4">Nenhum dado disponível ainda.</p>
+                    </div>
+                  </div>
+                )}
+
+                {!isLoadingReport && reportData && (
+                  <>
+                    {/* Cards resumo */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-5">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Receita Média/Mês</p>
+                        <p className="text-xl font-black text-success">R$ {reportData.averageMonthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-5">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Despesa Média/Mês</p>
+                        <p className="text-xl font-black text-danger">R$ {reportData.averageMonthlyExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      {reportData.bestMonth && (
+                        <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-5">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">🏆 Melhor Mês</p>
+                          <p className="text-sm font-black text-white">{reportData.bestMonth.label}</p>
+                          <p className="text-lg font-black text-success">+R$ {reportData.bestMonth.net.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                      )}
+                      {reportData.worstMonth && (
+                        <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-5">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">⚠️ Pior Mês</p>
+                          <p className="text-sm font-black text-white">{reportData.worstMonth.label}</p>
+                          <p className="text-lg font-black text-danger">R$ {reportData.worstMonth.net.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Gráfico receita vs despesa mensal */}
+                    {reportData.monthlySummary.length > 0 && (
+                      <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">📊 Receita vs Despesa por Mês</h3>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <BarChart data={reportData.monthlySummary} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                            <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={(v) => v.split(' ')[0].substring(0, 3)} />
+                            <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                            <Tooltip
+                              contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }}
+                              formatter={(value: number | undefined) => [`R$ ${(value ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, '']}
+                            />
+                            <Legend wrapperStyle={{ fontSize: '10px', color: '#64748b' }} />
+                            <Bar dataKey="income" name="Receita" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="expenses" name="Despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Gastos por categoria */}
+                      {reportData.categoryBreakdown.length > 0 && (
+                        <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6">
+                          <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">🗂️ Gastos por Categoria</h3>
+                          <div className="space-y-3">
+                            {reportData.categoryBreakdown.slice(0, 8).map((cat, i) => (
+                              <div key={i}>
+                                <div className="flex justify-between text-xs font-bold mb-1">
+                                  <span className="text-white">{cat.name}</span>
+                                  <span className="text-slate-400">R$ {cat.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-slate-600">({cat.percentage}%)</span></span>
+                                </div>
+                                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-primary rounded-full" style={{ width: `${cat.percentage}%` }}></div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Receita por fonte */}
+                      {reportData.incomeBySource.length > 0 && (
+                        <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6">
+                          <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">💰 Receita por Fonte</h3>
+                          <div className="space-y-3">
+                            {reportData.incomeBySource.map((src, i) => (
+                              <div key={i}>
+                                <div className="flex justify-between text-xs font-bold mb-1">
+                                  <span className="text-white">{src.source}</span>
+                                  <span className="text-slate-400">R$ {src.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} <span className="text-slate-600">({src.percentage}%)</span></span>
+                                </div>
+                                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-success rounded-full" style={{ width: `${src.percentage}%` }}></div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Top 10 maiores despesas */}
+                    {reportData.topExpenses.length > 0 && (
+                      <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">🔥 Top 10 Maiores Despesas</h3>
+                        <div className="space-y-2">
+                          {reportData.topExpenses.map((exp, i) => (
+                            <div key={i} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-black text-slate-600 w-5">#{i + 1}</span>
+                                <div>
+                                  <p className="text-sm font-bold text-white">{exp.title}</p>
+                                  <p className="text-[10px] text-slate-500">{exp.date}</p>
+                                </div>
+                              </div>
+                              <span className="text-sm font-black text-danger">R$ {exp.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Taxa de poupança por mês */}
+                    {reportData.monthlySummary.length > 0 && (
+                      <div className="bg-slate-900/40 border border-white/5 rounded-3xl p-6">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">💾 Taxa de Poupança por Mês</h3>
+                        <ResponsiveContainer width="100%" height={180}>
+                          <AreaChart data={reportData.monthlySummary}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                            <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={(v) => v.split(' ')[0].substring(0, 3)} />
+                            <YAxis tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={(v) => `${v}%`} domain={[0, 100]} />
+                            <Tooltip
+                              contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }}
+                              formatter={(value: number | undefined) => [`${(value ?? 0).toFixed(1)}%`, 'Poupança']}
+                            />
+                            <Area type="monotone" dataKey="savingsRate" name="Taxa de Poupança" stroke="#a855f7" fill="rgba(168,85,247,0.15)" strokeWidth={2} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <nav className="md:hidden fixed bottom-6 left-6 right-6 h-16 bg-slate-900/80 backdrop-blur-2xl border border-white/10 rounded-2xl flex items-center justify-around px-2 z-[100] shadow-2xl shadow-black">
@@ -915,6 +1196,8 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
           <MobileNavItem icon="calendar_month" active={activeTab === "agenda"} onClick={() => setActiveTab("agenda")} />
           <MobileNavItem icon="account_balance" active={activeTab === "patrimony"} onClick={() => setActiveTab("patrimony")} />
           <MobileNavItem icon="target" active={activeTab === "metas"} onClick={() => setActiveTab("metas")} />
+          <MobileNavItem icon="credit_card" active={activeTab === "cards"} onClick={() => setActiveTab("cards")} />
+          <MobileNavItem icon="bar_chart" active={activeTab === "reports"} onClick={() => { setActiveTab("reports"); loadReportData(); }} />
         </nav>
       </main>
       {isModalOpen && (
@@ -1252,6 +1535,64 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
               <div className="flex flex-col gap-2 pt-4">
                 <button disabled={isSubmitting} type="submit" className="h-12 bg-warning text-slate-950 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-warning/20 hover:scale-[1.02] transition-all disabled:opacity-50">Salvar Limite</button>
                 <button type="button" onClick={() => setIsBudgetModalOpen(false)} className="h-12 rounded-xl text-xs font-bold text-slate-500 hover:text-white transition-colors">Fechar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CARD MODAL */}
+      {isCardModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setIsCardModalOpen(false)}></div>
+          <div className="relative w-full max-w-sm bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-xl font-black text-white uppercase tracking-tighter">Novo Cartão</h3>
+              <button onClick={() => setIsCardModalOpen(false)} className="text-slate-500 hover:text-white transition-colors"><span className="material-symbols-outlined">close</span></button>
+            </div>
+            <form onSubmit={handleCreateCard} className="space-y-4">
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Nome do Cartão</label>
+                <input required name="name" placeholder="Ex: Nubank, Inter Gold..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+              </div>
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Bandeira</label>
+                <select required name="brand" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all">
+                  <option value="">Selecione...</option>
+                  <option value="Visa">Visa</option>
+                  <option value="Mastercard">Mastercard</option>
+                  <option value="Elo">Elo</option>
+                  <option value="Amex">American Express</option>
+                  <option value="Hipercard">Hipercard</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Limite (R$)</label>
+                <input required name="limitAmount" placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all font-bold text-center text-xl" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Fechamento (dia)</label>
+                  <input required name="closingDay" type="number" min="1" max="31" defaultValue="20" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-center font-bold" />
+                </div>
+                <div className="group">
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Vencimento (dia)</label>
+                  <input required name="dueDay" type="number" min="1" max="31" defaultValue="5" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-center font-bold" />
+                </div>
+              </div>
+              <div className="group">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Conta vinculada (opcional)</label>
+                <select name="accountId" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all">
+                  <option value="">Nenhuma</option>
+                  {data.accounts.map((acc: any) => (
+                    <option key={acc.id} value={acc.id}>{acc.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <button disabled={isSubmitting} type="submit" className="h-12 bg-primary text-white rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-50">{isSubmitting ? "Salvando..." : "Adicionar Cartão"}</button>
+                <button type="button" onClick={() => setIsCardModalOpen(false)} className="h-12 rounded-xl text-xs font-bold text-slate-500 hover:text-white transition-colors">Fechar</button>
               </div>
             </form>
           </div>

@@ -133,6 +133,16 @@ export interface AccountSummary {
   balance: number;
 }
 
+export interface CardSummary {
+  id: string;
+  name: string;
+  brand: string | null;
+  limitAmount: number;
+  closingDay: number;
+  dueDay: number;
+  accountName?: string | null;
+}
+
 export interface BudgetStatus {
   id: string;
   name: string;
@@ -168,4 +178,5 @@ export interface DashboardData {
   goals: Goal[];
   accounts: AccountSummary[];
   budgetStatus: BudgetStatus[];
+  cards: CardSummary[];
 }

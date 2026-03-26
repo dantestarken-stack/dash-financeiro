@@ -77,6 +77,7 @@ export async function getDashboardData(year: number, month: number, userId: stri
     assets,
     liabilities,
     goals,
+    cards,
   ] = await Promise.all([
     // Receitas do mês (por competência)
     prisma.income.findMany({
@@ -125,6 +126,12 @@ export async function getDashboardData(year: number, month: number, userId: stri
     prisma.liability.findMany({ where: { userId, deletedAt: null } }),
     // Metas (excluindo soft deleted)
     prisma.goal.findMany({ where: { userId, deletedAt: null } }),
+    // Cartões ativos
+    prisma.card.findMany({
+      where: { userId, isActive: true },
+      include: { account: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   // ── Agregações ─────────────────────────────────────────────────────────────
@@ -322,6 +329,15 @@ export async function getDashboardData(year: number, month: number, userId: stri
     goals,
     accounts: accounts.map((a) => ({ id: a.id, name: a.name, balance: a.currentBalance / 100 })),
     budgetStatus,
+    cards: cards.map((c) => ({
+      id: c.id,
+      name: c.name,
+      brand: c.brand,
+      limitAmount: c.limitAmount / 100,
+      closingDay: c.closingDay,
+      dueDay: c.dueDay,
+      accountName: c.account?.name ?? null,
+    })),
   };
 }
 
