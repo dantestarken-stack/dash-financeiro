@@ -1247,7 +1247,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
             <form onSubmit={handleUpdateBudget} className="space-y-6">
               <div className="group">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Limite Mensal (R$)</label>
-                <input required name="budgetLimit" defaultValue={data.expenseCategories.find((c: any) => c.id === selectedCategoryId)?.budgetLimit / 100 || ""} placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-warning transition-all font-bold text-center text-xl" />
+                <input required name="budgetLimit" defaultValue={((data.expenseCategories.find((c: any) => c.id === selectedCategoryId)?.budgetLimit) ?? 0) / 100 || ""} placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-warning transition-all font-bold text-center text-xl" />
               </div>
               <div className="flex flex-col gap-2 pt-4">
                 <button disabled={isSubmitting} type="submit" className="h-12 bg-warning text-slate-950 rounded-xl text-sm font-black uppercase tracking-widest shadow-lg shadow-warning/20 hover:scale-[1.02] transition-all disabled:opacity-50">Salvar Limite</button>
