@@ -82,6 +82,26 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
     router.refresh();
   }
 
+  // Drill-down modal state
+  const [drillDown, setDrillDown] = useState<{ title: string; items: any[] } | null>(null);
+
+  function openNatureDrillDown(nature: "essential" | "important" | "superfluous") {
+    const labels: Record<string, string> = { essential: "Gastos Essenciais", important: "Gastos Importantes", superfluous: "Gastos Supérfluos" };
+    const items = allTransactions.filter((t: any) => t.type === "expense" && t.nature === nature);
+    setDrillDown({ title: labels[nature], items });
+  }
+
+  function openCategoryDrillDown(categoryName: string) {
+    const catId = data.expenseCategories.find((c: any) => c.name === categoryName)?.id;
+    const items = allTransactions.filter((t: any) => t.type === "expense" && t.categoryId === catId);
+    setDrillDown({ title: `Despesas — ${categoryName}`, items });
+  }
+
+  function openAllExpensesDrillDown() {
+    const items = allTransactions.filter((t: any) => t.type === "expense" && (t.status === "paid" || t.status === "pending"));
+    setDrillDown({ title: "Todas as Saídas do Mês", items });
+  }
+
   // Report states
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
@@ -425,8 +445,8 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     </div>
 
                     {/* SAÍDAS */}
-                    <div 
-                      onClick={() => { setActiveTab("expenses"); setStatusFilter("all"); setGlobalSearch(""); }}
+                    <div
+                      onClick={() => openAllExpensesDrillDown()}
                       className="relative group overflow-hidden bg-gradient-to-br from-rose-500/10 to-slate-900/80 backdrop-blur-xl border border-rose-500/20 rounded-[2rem] p-6 shadow-2xl cursor-pointer hover:border-rose-500/40 transition-all active:scale-[0.99]"
                     >
                       <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-bl-full -z-10"></div>
@@ -557,18 +577,19 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                       </ResponsiveContainer>
                     </div>
                     <div className="mt-4 space-y-2">
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                        <span className="text-success">Essencial</span>
-                        <span className="text-white">{Math.round((data.spentByNature.essential / (data.spentByNature.essential + data.spentByNature.important + data.spentByNature.superfluous || 1)) * 100)}%</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                        <span className="text-warning">Importante</span>
-                        <span className="text-white">{Math.round((data.spentByNature.important / (data.spentByNature.essential + data.spentByNature.important + data.spentByNature.superfluous || 1)) * 100)}%</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                        <span className="text-danger">Supérfluo</span>
-                        <span className="text-white">{Math.round((data.spentByNature.superfluous / (data.spentByNature.essential + data.spentByNature.important + data.spentByNature.superfluous || 1)) * 100)}%</span>
-                      </div>
+                      {[
+                        { label: "Essencial", key: "essential" as const, color: "text-success", value: data.spentByNature.essential },
+                        { label: "Importante", key: "important" as const, color: "text-warning", value: data.spentByNature.important },
+                        { label: "Supérfluo", key: "superfluous" as const, color: "text-danger", value: data.spentByNature.superfluous },
+                      ].map(({ label, key, color, value }) => {
+                        const total = data.spentByNature.essential + data.spentByNature.important + data.spentByNature.superfluous || 1;
+                        return (
+                          <button key={key} onClick={() => openNatureDrillDown(key)} className="w-full flex justify-between items-center text-[10px] font-black uppercase hover:bg-white/5 px-2 py-1.5 rounded-lg transition-all group">
+                            <span className={`${color} flex items-center gap-1`}>{label} <span className="material-symbols-outlined text-[10px] opacity-0 group-hover:opacity-60">open_in_new</span></span>
+                            <span className="text-white">R$ {value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} <span className="text-slate-500">({Math.round((value / total) * 100)}%)</span></span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -917,13 +938,14 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                       {data.budgetStatus?.length === 0 ? (
                         <div className="bg-white/5 border border-dashed border-white/10 rounded-3xl p-12 text-center text-slate-500 italic">Configure limites nas suas categorias de despesa.</div>
                       ) : data.budgetStatus.map((budget: any) => (
-                        <div key={budget.id} className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 group cursor-pointer hover:border-white/10 transition-all" onClick={() => { setSelectedCategoryId(budget.id); setIsBudgetModalOpen(true); }}>
+                        <div key={budget.id} className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 group cursor-pointer hover:border-white/10 transition-all">
                           <div className="flex justify-between items-center mb-4">
-                            <h4 className="font-bold text-white flex items-center gap-2">
+                            <h4 onClick={() => openCategoryDrillDown(budget.name)} className="font-bold text-white flex items-center gap-2 hover:text-primary transition-colors">
                               <span className="material-symbols-outlined text-xs text-slate-500">category</span>
                               {budget.name}
+                              <span className="material-symbols-outlined text-[10px] text-slate-600 group-hover:text-primary transition-colors">open_in_new</span>
                             </h4>
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded ${budget.percent > 90 ? 'bg-danger/20 text-danger' : budget.percent > 70 ? 'bg-warning/20 text-warning' : 'bg-success/20 text-success'}`}>
+                            <span onClick={() => { setSelectedCategoryId(budget.id); setIsBudgetModalOpen(true); }} className={`text-[10px] font-black px-2 py-0.5 rounded cursor-pointer hover:opacity-80 ${budget.percent > 90 ? 'bg-danger/20 text-danger' : budget.percent > 70 ? 'bg-warning/20 text-warning' : 'bg-success/20 text-success'}`}>
                               {budget.percent > 100 ? 'ESTOURADO' : `${Math.round(budget.percent)}%`}
                             </span>
                           </div>
@@ -1537,6 +1559,50 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                 <button type="button" onClick={() => setIsBudgetModalOpen(false)} className="h-12 rounded-xl text-xs font-bold text-slate-500 hover:text-white transition-colors">Fechar</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DRILL-DOWN MODAL */}
+      {drillDown && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setDrillDown(null)}></div>
+          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6 shrink-0">
+              <div>
+                <h3 className="text-lg font-black text-white uppercase tracking-tighter">{drillDown.title}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{drillDown.items.length} lançamento(s)</p>
+              </div>
+              <button onClick={() => setDrillDown(null)} className="text-slate-500 hover:text-white transition-colors"><span className="material-symbols-outlined">close</span></button>
+            </div>
+
+            {drillDown.items.length === 0 ? (
+              <div className="text-center py-12 text-slate-500 italic text-sm">Nenhum lançamento encontrado.</div>
+            ) : (
+              <div className="overflow-y-auto space-y-2 pr-1">
+                {drillDown.items
+                  .sort((a: any, b: any) => Math.abs(b.amount) - Math.abs(a.amount))
+                  .map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${item.status === 'paid' || item.status === 'received' ? 'bg-danger/10' : 'bg-slate-700'}`}>
+                          <span className="material-symbols-outlined text-sm text-danger">receipt_long</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-white leading-tight">{item.name}</p>
+                          <p className="text-[10px] text-slate-500">{item.displayDate} · <span className={`font-bold ${item.status === 'paid' ? 'text-success' : 'text-warning'}`}>{item.status === 'paid' ? 'Pago' : item.status === 'pending' ? 'Pendente' : item.status}</span></p>
+                          {item.notes && <p className="text-[10px] text-slate-600 italic mt-0.5">{item.notes}</p>}
+                        </div>
+                      </div>
+                      <span className="text-sm font-black text-danger shrink-0 ml-4">R$ {Math.abs(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  ))}
+                <div className="pt-3 border-t border-white/5 flex justify-between text-xs font-black uppercase tracking-widest">
+                  <span className="text-slate-500">Total</span>
+                  <span className="text-white">R$ {drillDown.items.reduce((acc: number, t: any) => acc + Math.abs(t.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
