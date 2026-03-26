@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma";
 import { startOfMonth, isBefore, isSameMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { TransactionStatus } from "@/lib/types";
 
 // ─── Tipos internos ──────────────────────────────────────────────────────────
 
@@ -13,7 +14,7 @@ interface MappedTransaction {
   type: "income" | "expense";
   date: string;
   displayDate: string;
-  status: string;
+  status: TransactionStatus;
   nature?: string;
   categoryId?: string;
   incomeSourceId?: string;
