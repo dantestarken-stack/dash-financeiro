@@ -14,6 +14,14 @@ const key = new TextEncoder().encode(process.env.JWT_SECRET);
 const SESSION_TTL_DAYS = 30;
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
 
+export interface SessionPayload {
+    userId: string;
+    onboardingCompleted?: boolean;
+    iat?: number;
+    exp?: number;
+    [key: string]: unknown;
+}
+
 export async function encrypt(payload: object) {
     return await new SignJWT(payload as Record<string, unknown>)
         .setProtectedHeader({ alg: "HS256" })
@@ -24,11 +32,11 @@ export async function encrypt(payload: object) {
 
 export { SESSION_TTL_MS };
 
-export async function decrypt(input: string): Promise<Record<string, unknown>> {
+export async function decrypt(input: string): Promise<SessionPayload> {
     const { payload } = await jwtVerify(input, key, {
         algorithms: ["HS256"],
     });
-    return payload as Record<string, unknown>;
+    return payload as SessionPayload;
 }
 
 export async function getSession() {
