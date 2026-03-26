@@ -727,8 +727,56 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                       </div>
                     );
 
+                    const totalPending = pending.reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
+                    const totalReceived = received.reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
+                    const totalAll = totalPending + totalReceived;
+                    const receivedPct = totalAll > 0 ? (totalReceived / totalAll) * 100 : 0;
+
                     return (
                       <div className="space-y-6">
+                        {/* ── Painel de resumo ── */}
+                        <div className="bg-slate-900/60 border border-white/5 rounded-[2rem] p-6 shadow-2xl">
+                          <div className="grid grid-cols-3 gap-4 mb-5">
+                            {/* Total geral */}
+                            <div className="col-span-3 sm:col-span-1 flex flex-col gap-1">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total do período</span>
+                              <span className="text-3xl font-black text-white tracking-tighter">
+                                R$ {totalAll.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] text-slate-600">{filtered.length} lançamento{filtered.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            {/* A receber */}
+                            <div className="flex flex-col gap-1 border-l border-white/5 pl-4">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-warning">A Receber</span>
+                              <span className="text-2xl font-black text-warning tracking-tighter">
+                                R$ {totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] text-slate-600">{pending.length} pendente{pending.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            {/* Recebido */}
+                            <div className="flex flex-col gap-1 border-l border-white/5 pl-4">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-success">Recebido</span>
+                              <span className="text-2xl font-black text-success tracking-tighter">
+                                R$ {totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] text-slate-600">{received.length} liquidado{received.length !== 1 ? 's' : ''}</span>
+                            </div>
+                          </div>
+                          {/* Barra de progresso */}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                              <span>Progresso de recebimento</span>
+                              <span>{receivedPct.toFixed(0)}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-success rounded-full transition-all duration-700"
+                                style={{ width: `${receivedPct}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Seção A Receber */}
                         {(statusFilter === "all" || statusFilter === "expected") && pending.length > 0 && (
                           <div>
