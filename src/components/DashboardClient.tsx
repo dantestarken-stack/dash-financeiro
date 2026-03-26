@@ -158,6 +158,32 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
     setPayingId(null);
   }
 
+  // ── Edit transaction modal ────────────────────────────────────────────────
+  const [editingTx, setEditingTx] = useState<any | null>(null);
+  const [isSavingTx, setIsSavingTx] = useState(false);
+
+  async function handleSaveEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingTx) return;
+    setIsSavingTx(true);
+    const form = new FormData(e.currentTarget);
+    const amountStr = form.get("amount") as string;
+    const amountCentavos = amountStr
+      ? Math.round(parseFloat(amountStr.replace(/\./g, "").replace(",", ".")) * 100)
+      : undefined;
+    await updateTransaction(editingTx.id, editingTx.type, {
+      title: form.get("title") as string || undefined,
+      notes: (form.get("notes") as string) || undefined,
+      nature: editingTx.type === "expense" ? (form.get("nature") as string) || undefined : undefined,
+      categoryId: editingTx.type === "expense" ? (form.get("categoryId") as string) || undefined : undefined,
+      date: (form.get("date") as string) || undefined,
+      amount: amountCentavos,
+    });
+    setIsSavingTx(false);
+    setEditingTx(null);
+    router.refresh();
+  }
+
   function handleMonthChange(offset: number) {
     let newMonth = currentMonth + offset;
     let newYear = currentYear;
@@ -716,7 +742,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                             <div className="bg-slate-900/40 backdrop-blur-xl border border-warning/10 rounded-[2rem] overflow-hidden shadow-2xl">
                               <div className="p-6 space-y-4">
                                 {pending.map((t: any) => (
-                                  <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                                  <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} onEdit={setEditingTx} />
                                 ))}
                               </div>
                             </div>
@@ -736,7 +762,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                             <div className="bg-slate-900/40 backdrop-blur-xl border border-success/10 rounded-[2rem] overflow-hidden shadow-2xl">
                               <div className="p-6 space-y-4">
                                 {received.map((t: any) => (
-                                  <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                                  <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} onEdit={setEditingTx} />
                                 ))}
                               </div>
                             </div>
@@ -761,7 +787,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                         if (filtered.length === 0) return <div className="py-20 text-center text-slate-500 font-medium">Nenhum registro encontrado para este filtro.</div>;
 
                         return filtered.map((t: any) => (
-                          <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                          <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} onEdit={setEditingTx} />
                         ));
                       })()}
                     </div>
@@ -1759,6 +1785,91 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
         </div>
       )}
 
+      {/* EDIT TRANSACTION MODAL */}
+      {editingTx && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setEditingTx(null)}></div>
+          <div className="relative w-full max-w-md bg-slate-900 border border-white/10 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter">Editar Lançamento</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{editingTx.type === "income" ? "Receita" : "Despesa"}</p>
+              </div>
+              <button onClick={() => setEditingTx(null)} className="text-slate-500 hover:text-white transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Nome */}
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Nome</label>
+                <input name="title" required defaultValue={editingTx.name}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+              </div>
+              {/* Valor + Data */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Valor (R$)</label>
+                  <input name="amount"
+                    defaultValue={Math.abs(editingTx.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all font-bold" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">
+                    Vencimento {editingTx.type === "income" && <span className="text-slate-600 normal-case font-normal">(opcional)</span>}
+                  </label>
+                  <input name="date" type="date"
+                    required={editingTx.type === "expense"}
+                    defaultValue={editingTx.date ? editingTx.date.split("T")[0] : ""}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+                </div>
+              </div>
+              {/* Despesa: natureza + categoria */}
+              {editingTx.type === "expense" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Natureza</label>
+                    <select name="nature" defaultValue={editingTx.nature || "essential"}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm">
+                      <option value="essential">Essencial</option>
+                      <option value="important">Importante</option>
+                      <option value="superfluous">Supérfluo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Categoria</label>
+                    <select name="categoryId" defaultValue={editingTx.categoryId || ""}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all text-sm">
+                      <option value="">— Sem categoria —</option>
+                      {data.expenseCategories.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+              {/* Observações */}
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Observações</label>
+                <input name="notes" defaultValue={editingTx.notes || ""}
+                  placeholder="Opcional..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={isSavingTx}
+                  className="flex-1 h-12 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary/80 transition-all disabled:opacity-50 shadow-lg shadow-primary/20">
+                  {isSavingTx ? "Salvando..." : "Salvar alterações"}
+                </button>
+                <button type="button" onClick={() => setEditingTx(null)}
+                  className="h-12 px-6 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10 transition-all">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* CARD MODAL */}
       {isCardModalOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -1820,7 +1931,7 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
   );
 }
 
-function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete }: any) {
+function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete, onEdit }: any) {
   return (
     <div
       className="transaction-row flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/[0.08] transition-all group relative overflow-hidden"
@@ -1865,8 +1976,20 @@ function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete 
       <div className="flex items-center justify-between sm:justify-end gap-6 mt-4 sm:mt-0 pl-20 sm:pl-0 w-full sm:w-auto">
         <div className={`text-2xl font-black tracking-tighter ${t.type === 'income' ? 'text-success' : 'text-white'}`}>{t.type === 'income' ? '+' : '-'} R$ {Math.abs(t.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
         <div className="flex items-center gap-2 lg:opacity-0 group-hover:opacity-100 transition-all">
-          {(t.status === "pending" || t.status === "expected" || t.status === "partial") && <button disabled={payingId === t.id} onClick={() => handleMarkPaid(t.id, t.type)} className="bg-white text-slate-900 h-10 px-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl active:scale-95">{t.status === "partial" ? "Quitar" : "Baixar"}</button>}
-          <button disabled={deletingId === t.id} onClick={() => handleDelete(t.id, t.type)} className="w-10 h-10 rounded-xl bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center active:scale-90 shadow-xl"><span className="material-symbols-outlined text-xl">delete</span></button>
+          {(t.status === "pending" || t.status === "expected" || t.status === "partial") && (
+            <button disabled={payingId === t.id} onClick={() => handleMarkPaid(t.id, t.type)}
+              className="bg-white text-slate-900 h-10 px-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl active:scale-95">
+              {t.status === "partial" ? "Quitar" : "Baixar"}
+            </button>
+          )}
+          <button onClick={() => onEdit?.(t)}
+            className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center active:scale-90">
+            <span className="material-symbols-outlined text-xl">edit</span>
+          </button>
+          <button disabled={deletingId === t.id} onClick={() => handleDelete(t.id, t.type)}
+            className="w-10 h-10 rounded-xl bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center active:scale-90 shadow-xl">
+            <span className="material-symbols-outlined text-xl">delete</span>
+          </button>
         </div>
       </div>
     </div>
