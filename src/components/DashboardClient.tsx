@@ -681,25 +681,92 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     </select>
                   </div>
                 </div>
-                <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
-                  <div className="p-8 space-y-4">
-                    {(() => {
-                      const filtered = allTransactions.filter((t: any) => {
-                        const matchesType = t.type === (activeTab === "incomes" ? "income" : "expense");
-                        const matchesSearch = !globalSearch || t.name.toLowerCase().includes(globalSearch.toLowerCase()) || (t.notes && t.notes.toLowerCase().includes(globalSearch.toLowerCase()));
-                        const matchesCategory = !categoryFilter || t.categoryId === categoryFilter || t.incomeSourceId === categoryFilter || t.nature === categoryFilter;
-                        const matchesStatus = statusFilter === "all" || t.status === statusFilter;
-                        return matchesType && matchesSearch && matchesCategory && matchesStatus;
-                      });
+                {activeTab === "incomes" ? (
+                  // ── PORTFÓLIO DE RECEITAS — com separação A Receber / Recebido ──
+                  (() => {
+                    const filtered = allTransactions.filter((t: any) => {
+                      const matchesType = t.type === "income";
+                      const matchesSearch = !globalSearch || t.name.toLowerCase().includes(globalSearch.toLowerCase()) || (t.notes && t.notes.toLowerCase().includes(globalSearch.toLowerCase()));
+                      const matchesCategory = !categoryFilter || t.incomeSourceId === categoryFilter;
+                      const matchesStatus = statusFilter === "all" || t.status === statusFilter;
+                      return matchesType && matchesSearch && matchesCategory && matchesStatus;
+                    });
 
-                      if (filtered.length === 0) return <div className="py-20 text-center text-slate-500 font-medium">Nenhum registro tático encontrado para este filtro.</div>;
+                    const pending = filtered.filter((t: any) => t.status !== "received");
+                    const received = filtered.filter((t: any) => t.status === "received");
 
-                      return filtered.map((t: any) => (
-                        <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
-                      ));
-                    })()}
+                    if (filtered.length === 0) return (
+                      <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] p-16 text-center text-slate-500 font-medium shadow-2xl">
+                        Nenhum registro encontrado para este filtro.
+                      </div>
+                    );
+
+                    return (
+                      <div className="space-y-6">
+                        {/* Seção A Receber */}
+                        {(statusFilter === "all" || statusFilter === "expected") && pending.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-3 mb-3 px-1">
+                              <div className="w-2 h-2 rounded-full bg-warning animate-pulse"></div>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-warning">A Receber</span>
+                              <span className="text-[10px] font-bold text-slate-600 ml-auto">
+                                R$ {pending.reduce((s: number, t: any) => s + Math.abs(t.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div className="bg-slate-900/40 backdrop-blur-xl border border-warning/10 rounded-[2rem] overflow-hidden shadow-2xl">
+                              <div className="p-6 space-y-4">
+                                {pending.map((t: any) => (
+                                  <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Seção Recebido */}
+                        {(statusFilter === "all" || statusFilter === "received") && received.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-3 mb-3 px-1">
+                              <div className="w-2 h-2 rounded-full bg-success"></div>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-success">Recebido</span>
+                              <span className="text-[10px] font-bold text-slate-600 ml-auto">
+                                R$ {received.reduce((s: number, t: any) => s + Math.abs(t.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <div className="bg-slate-900/40 backdrop-blur-xl border border-success/10 rounded-[2rem] overflow-hidden shadow-2xl">
+                              <div className="p-6 space-y-4">
+                                {received.map((t: any) => (
+                                  <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : (
+                  // ── CENTRO DE DESPESAS — lista simples ──
+                  <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] overflow-hidden shadow-2xl">
+                    <div className="p-8 space-y-4">
+                      {(() => {
+                        const filtered = allTransactions.filter((t: any) => {
+                          const matchesType = t.type === "expense";
+                          const matchesSearch = !globalSearch || t.name.toLowerCase().includes(globalSearch.toLowerCase()) || (t.notes && t.notes.toLowerCase().includes(globalSearch.toLowerCase()));
+                          const matchesCategory = !categoryFilter || t.categoryId === categoryFilter || t.nature === categoryFilter;
+                          const matchesStatus = statusFilter === "all" || t.status === statusFilter;
+                          return matchesType && matchesSearch && matchesCategory && matchesStatus;
+                        });
+
+                        if (filtered.length === 0) return <div className="py-20 text-center text-slate-500 font-medium">Nenhum registro encontrado para este filtro.</div>;
+
+                        return filtered.map((t: any) => (
+                          <TransactionRow key={t.id} t={t} payingId={payingId} deletingId={deletingId} handleMarkPaid={handleMarkPaid} handleDelete={handleDelete} />
+                        ));
+                      })()}
+                    </div>
                   </div>
-                </div>
+                )}
                 {activeTab === "incomes" && data.futureCommissions?.length > 0 && (
                   <div className="animate-in fade-in slide-in-from-top-4 space-y-6 pt-4">
                     <div className="flex items-center gap-3">
