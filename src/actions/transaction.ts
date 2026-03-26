@@ -284,6 +284,106 @@ export async function markTransactionAsPaid(id: string, type: "income" | "expens
     return { success: true };
 }
 
+// ─── updateTransaction ────────────────────────────────────────────────────────
+
+export async function updateTransaction(
+    id: string,
+    type: "income" | "expense",
+    data: {
+        title?: string;
+        nature?: string;
+        categoryId?: string;
+        notes?: string;
+        status?: string;
+        amount?: number; // in centavos
+        date?: string;
+    }
+) {
+    const userId = await requireUserId();
+
+    if (type === "expense") {
+        const existing = await prisma.expense.findUnique({ where: { id, userId } });
+        if (!existing || existing.deletedAt) return { error: "Despesa não encontrada" };
+
+        const updateData: Record<string, unknown> = {};
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.nature !== undefined) updateData.nature = data.nature;
+        if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+        if (data.notes !== undefined) updateData.notes = data.notes;
+        if (data.date !== undefined) {
+            const d = new Date(data.date);
+            updateData.dueDate = d;
+            updateData.competencyDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+        }
+
+        // Handle amount change (if expense is paid, adjust account balance)
+        if (data.amount !== undefined && data.amount !== existing.amount) {
+            const diff = data.amount - existing.amount;
+            await prisma.$transaction(async (tx) => {
+                await tx.expense.update({
+                    where: { id, userId },
+                    data: {
+                        ...updateData,
+                        amount: data.amount,
+                        paidAmount: existing.status === "paid" ? data.amount : existing.paidAmount,
+                    }
+                });
+                if (existing.status === "paid" && existing.accountId) {
+                    await tx.account.update({
+                        where: { id: existing.accountId },
+                        data: { currentBalance: { decrement: diff } }
+                    });
+                }
+            });
+        } else {
+            await prisma.expense.update({
+                where: { id, userId },
+                data: updateData
+            });
+        }
+    } else {
+        const existing = await prisma.income.findUnique({ where: { id, userId } });
+        if (!existing || existing.deletedAt) return { error: "Receita não encontrada" };
+
+        const updateData: Record<string, unknown> = {};
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.notes !== undefined) updateData.notes = data.notes;
+        if (data.date !== undefined) {
+            const d = new Date(data.date);
+            updateData.dueDate = d;
+            updateData.competencyDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+        }
+
+        if (data.amount !== undefined && data.amount !== existing.expectedAmount) {
+            const diff = data.amount - existing.expectedAmount;
+            await prisma.$transaction(async (tx) => {
+                await tx.income.update({
+                    where: { id, userId },
+                    data: {
+                        ...updateData,
+                        expectedAmount: data.amount,
+                        receivedAmount: existing.status === "received" ? data.amount : existing.receivedAmount,
+                    }
+                });
+                if (existing.status === "received" && existing.accountId) {
+                    await tx.account.update({
+                        where: { id: existing.accountId },
+                        data: { currentBalance: { increment: diff } }
+                    });
+                }
+            });
+        } else {
+            await prisma.income.update({
+                where: { id, userId },
+                data: updateData
+            });
+        }
+    }
+
+    revalidatePath("/");
+    return { success: true };
+}
+
 // ─── deleteTransaction ────────────────────────────────────────────────────────
 
 export async function deleteTransaction(id: string, type: "income" | "expense") {

@@ -19,7 +19,7 @@ import {
 } from "recharts";
 import { getReportData, type ReportData } from "@/actions/reports";
 import { useRouter } from "next/navigation";
-import { createTransaction, markTransactionAsPaid, deleteTransaction } from "@/actions/transaction";
+import { createTransaction, markTransactionAsPaid, deleteTransaction, updateTransaction } from "@/actions/transaction";
 import { createAsset, createLiability, deleteAsset, deleteLiability } from "@/actions/patrimony";
 import { createCard, deleteCard } from "@/actions/cards";
 import { createGoal, updateGoalProgress, deleteGoal, updateCategoryBudget } from "@/actions/goal";
@@ -84,6 +84,26 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
 
   // Drill-down modal state
   const [drillDown, setDrillDown] = useState<{ title: string; items: any[] } | null>(null);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [isEditSaving, setIsEditSaving] = useState(false);
+
+  async function handleEditSave(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingItem) return;
+    setIsEditSaving(true);
+    const form = new FormData(e.currentTarget);
+    await updateTransaction(editingItem.id, "expense", {
+      title: form.get("title") as string,
+      nature: form.get("nature") as string,
+      categoryId: form.get("categoryId") as string || undefined,
+      notes: form.get("notes") as string || undefined,
+    });
+    setIsEditSaving(false);
+    setEditingItem(null);
+    // Refresh to reload allTransactions with updated data
+    router.refresh();
+    setDrillDown(null);
+  }
 
   function openNatureDrillDown(nature: "essential" | "important" | "superfluous") {
     const labels: Record<string, string> = { essential: "Gastos Essenciais", important: "Gastos Importantes", superfluous: "Gastos Supérfluos" };
@@ -1566,15 +1586,65 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
       {/* DRILL-DOWN MODAL */}
       {drillDown && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setDrillDown(null)}></div>
-          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[80vh] flex flex-col">
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => { setDrillDown(null); setEditingItem(null); }}></div>
+          <div className="relative w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2rem] p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-center mb-6 shrink-0">
               <div>
                 <h3 className="text-lg font-black text-white uppercase tracking-tighter">{drillDown.title}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">{drillDown.items.length} lançamento(s)</p>
               </div>
-              <button onClick={() => setDrillDown(null)} className="text-slate-500 hover:text-white transition-colors"><span className="material-symbols-outlined">close</span></button>
+              <button onClick={() => { setDrillDown(null); setEditingItem(null); }} className="text-slate-500 hover:text-white transition-colors"><span className="material-symbols-outlined">close</span></button>
             </div>
+
+            {/* Inline edit form */}
+            {editingItem && (
+              <div className="mb-4 p-4 bg-primary/10 border border-primary/20 rounded-2xl shrink-0">
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">Editando: {editingItem.name}</p>
+                <form onSubmit={handleEditSave} className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Nome</label>
+                    <input name="title" defaultValue={editingItem.name} required
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-primary" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Natureza</label>
+                      <select name="nature" defaultValue={editingItem.nature || "essential"}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-primary">
+                        <option value="essential">Essencial</option>
+                        <option value="important">Importante</option>
+                        <option value="superfluous">Supérfluo</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Categoria</label>
+                      <select name="categoryId" defaultValue={editingItem.categoryId || ""}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-primary">
+                        <option value="">— Sem categoria —</option>
+                        {data.expenseCategories.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Observações</label>
+                    <input name="notes" defaultValue={editingItem.notes || ""}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-primary" />
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button type="submit" disabled={isEditSaving}
+                      className="flex-1 h-9 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50">
+                      {isEditSaving ? "Salvando..." : "Salvar"}
+                    </button>
+                    <button type="button" onClick={() => setEditingItem(null)}
+                      className="h-9 px-4 bg-white/5 border border-white/10 text-slate-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-white/10">
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
             {drillDown.items.length === 0 ? (
               <div className="text-center py-12 text-slate-500 italic text-sm">Nenhum lançamento encontrado.</div>
@@ -1583,21 +1653,29 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                 {drillDown.items
                   .sort((a: any, b: any) => Math.abs(b.amount) - Math.abs(a.amount))
                   .map((item: any) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5">
-                      <div className="flex items-center gap-3">
+                    <div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${editingItem?.id === item.id ? 'bg-primary/5 border-primary/20' : 'bg-white/5 border-white/5'}`}>
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${item.status === 'paid' || item.status === 'received' ? 'bg-danger/10' : 'bg-slate-700'}`}>
                           <span className="material-symbols-outlined text-sm text-danger">receipt_long</span>
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-white leading-tight">{item.name}</p>
-                          <p className="text-[10px] text-slate-500">{item.displayDate} · <span className={`font-bold ${item.status === 'paid' ? 'text-success' : 'text-warning'}`}>{item.status === 'paid' ? 'Pago' : item.status === 'pending' ? 'Pendente' : item.status}</span></p>
-                          {item.notes && <p className="text-[10px] text-slate-600 italic mt-0.5">{item.notes}</p>}
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-white leading-tight truncate">{item.name}</p>
+                          <p className="text-[10px] text-slate-500">{item.displayDate} · <span className={`font-bold ${item.status === 'paid' ? 'text-success' : 'text-warning'}`}>{item.status === 'paid' ? 'Pago' : item.status === 'pending' ? 'Pendente' : item.status}</span> {item.nature && <span className="text-slate-600">· {item.nature === 'essential' ? 'Essencial' : item.nature === 'important' ? 'Importante' : 'Supérfluo'}</span>}</p>
+                          {item.notes && <p className="text-[10px] text-slate-600 italic mt-0.5 truncate">{item.notes}</p>}
                         </div>
                       </div>
-                      <span className="text-sm font-black text-danger shrink-0 ml-4">R$ {Math.abs(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <div className="flex items-center gap-2 shrink-0 ml-3">
+                        <span className="text-sm font-black text-danger">R$ {Math.abs(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        {item.type === "expense" && (
+                          <button onClick={() => setEditingItem(editingItem?.id === item.id ? null : item)}
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${editingItem?.id === item.id ? 'bg-primary text-white' : 'bg-white/5 text-slate-500 hover:text-white hover:bg-white/10'}`}>
+                            <span className="material-symbols-outlined text-sm">edit</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
-                <div className="pt-3 border-t border-white/5 flex justify-between text-xs font-black uppercase tracking-widest">
+                <div className="pt-3 border-t border-white/5 flex justify-between text-xs font-black uppercase tracking-widest shrink-0">
                   <span className="text-slate-500">Total</span>
                   <span className="text-white">R$ {drillDown.items.reduce((acc: number, t: any) => acc + Math.abs(t.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
