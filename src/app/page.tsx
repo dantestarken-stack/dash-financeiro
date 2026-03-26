@@ -12,8 +12,8 @@ export default async function Page({
     searchParams: Promise<{ month?: string; year?: string }>;
 }) {
     const params = await searchParams;
-    const month = params.month ? parseInt(params.month) : new Date().getMonth();
-    const year = params.year ? parseInt(params.year) : new Date().getFullYear();
+    const month = params.month ? parseInt(params.month as string) : new Date().getMonth();
+    const year = params.year ? parseInt(params.year as string) : new Date().getFullYear();
 
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("session")?.value;
