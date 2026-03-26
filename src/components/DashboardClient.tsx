@@ -1838,14 +1838,27 @@ function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete 
               </a>
             )}
           </h4>
-          <div className="flex items-center gap-3 mt-1.5"><span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-widest ${t.status === 'paid' || t.status === 'received' ? 'bg-white/10 text-slate-500' : 'bg-warning/20 text-warning'}`}>{t.status === 'expected' || t.status === 'pending' ? 'Pendente' : 'Liquidado'}</span><span className="text-xs font-bold text-slate-500">Vence {t.displayDate}</span></div>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md tracking-widest
+              ${t.status === 'paid' || t.status === 'received' ? 'bg-white/10 text-slate-500'
+              : t.status === 'partial' ? 'bg-primary/20 text-primary'
+              : 'bg-warning/20 text-warning'}`}>
+              {t.status === 'paid' || t.status === 'received' ? 'Liquidado'
+               : t.status === 'partial' ? 'Parcial'
+               : 'Pendente'}
+            </span>
+            <span className="text-xs font-bold text-slate-500">Vence {t.displayDate}</span>
+            {t.status === 'partial' && t.type === 'income' && (
+              <span className="text-[10px] text-primary font-bold">Saldo pendente</span>
+            )}
+          </div>
           {t.notes && <p className="text-xs text-slate-400 mt-2 italic flex items-center gap-1.5"><span className="material-symbols-outlined text-xs">info</span> {t.notes}</p>}
         </div>
       </div>
       <div className="flex items-center justify-between sm:justify-end gap-6 mt-4 sm:mt-0 pl-20 sm:pl-0 w-full sm:w-auto">
         <div className={`text-2xl font-black tracking-tighter ${t.type === 'income' ? 'text-success' : 'text-white'}`}>{t.type === 'income' ? '+' : '-'} R$ {Math.abs(t.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
         <div className="flex items-center gap-2 lg:opacity-0 group-hover:opacity-100 transition-all">
-          {(t.status === "pending" || t.status === "expected") && <button disabled={payingId === t.id} onClick={() => handleMarkPaid(t.id, t.type)} className="bg-white text-slate-900 h-10 px-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl active:scale-95">Baixar</button>}
+          {(t.status === "pending" || t.status === "expected" || t.status === "partial") && <button disabled={payingId === t.id} onClick={() => handleMarkPaid(t.id, t.type)} className="bg-white text-slate-900 h-10 px-4 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all shadow-xl active:scale-95">{t.status === "partial" ? "Quitar" : "Baixar"}</button>}
           <button disabled={deletingId === t.id} onClick={() => handleDelete(t.id, t.type)} className="w-10 h-10 rounded-xl bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center active:scale-90 shadow-xl"><span className="material-symbols-outlined text-xl">delete</span></button>
         </div>
       </div>

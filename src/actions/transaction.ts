@@ -250,6 +250,9 @@ export async function markTransactionAsPaid(id: string, type: "income" | "expens
         if (type === "income") {
             const inc = await tx.income.findUnique({ where: { id, userId } });
             if (!inc) return;
+            // For partial incomes, only credit the remaining balance (expected - already received)
+            const remainingAmount = inc.expectedAmount - (inc.receivedAmount ?? 0);
+            const creditAmount = inc.status === "partial" ? remainingAmount : inc.expectedAmount;
             await tx.income.update({
                 where: { id },
                 data: {
@@ -260,7 +263,7 @@ export async function markTransactionAsPaid(id: string, type: "income" | "expens
             });
             await tx.account.update({
                 where: { id: inc.accountId },
-                data: { currentBalance: { increment: inc.expectedAmount } }
+                data: { currentBalance: { increment: creditAmount } }
             });
         } else {
             const exp = await tx.expense.findUnique({ where: { id, userId } });
