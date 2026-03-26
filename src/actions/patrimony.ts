@@ -43,7 +43,7 @@ export async function createLiability(formData: FormData) {
         monthlyPayment: formData.get("monthlyPayment"),
         notes: formData.get("notes") || "",
     });
-    if (!parsed.success) throw new Error(parsed.error.errors[0].message);
+    if (!parsed.success) throw new Error(parsed.error.issues[0].message);
     const { name, type, totalAmount, outstandingAmount, monthlyPayment, notes } = parsed.data;
 
     await prisma.liability.create({
