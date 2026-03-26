@@ -31,12 +31,24 @@ export async function createTransaction(formData: FormData) {
     const dueDateStr = formData.get("dueDate") as string;
     const file = formData.get("attachment") as File;
 
-    if (!title || !accountId || !dueDateStr) {
+    // dueDate is required for expenses but optional for incomes (defaults to last day of current month)
+    if (!title || !accountId) {
         throw new Error("Campos obrigatórios ausentes.");
+    }
+    if (type === "expense" && !dueDateStr) {
+        throw new Error("Data de vencimento obrigatória para despesas.");
     }
 
     const totalAmountCentavos = parseCentavos(formData.get("amount") as string);
-    const dueDate = new Date(dueDateStr);
+
+    let dueDate: Date;
+    if (dueDateStr) {
+        dueDate = new Date(dueDateStr);
+    } else {
+        // Default to last day of current month for incomes without a due date
+        const now = new Date();
+        dueDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+    }
     const competencyDate = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), 1));
 
     let transactionId = "";

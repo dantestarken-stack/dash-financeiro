@@ -1366,8 +1366,15 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                     <input required name="amount" defaultValue={isCommission ? computedAmount : ""} key={isCommission ? "comm-" + computedAmount : "manual"} placeholder="0,00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all font-bold" />
                   </div>
                   <div className="group">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">Vencimento</label>
-                    <input required name="dueDate" type="date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all" />
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1 ml-1">
+                      Vencimento {txType !== "expense" && <span className="text-slate-600 normal-case font-normal">(opcional)</span>}
+                    </label>
+                    <input
+                      required={txType === "expense"}
+                      name="dueDate"
+                      type="date"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-primary transition-all"
+                    />
                   </div>
                 </div>
 
