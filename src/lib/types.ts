@@ -17,6 +17,8 @@ export interface KPIs {
   totalAssets: number;
   totalLiabilities: number;
   pendingSalaryBalance: number;
+  pendingDebtRecovery: number;
+  moneyOnTable: number;
 }
 
 export interface SpentByNature {

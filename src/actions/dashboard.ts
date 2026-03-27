@@ -182,6 +182,15 @@ export async function getDashboardData(year: number, month: number, userId: stri
     return remaining > 0 ? acc + remaining : acc;
   }, 0);
 
+  // Dívidas a receber pendentes (todas as receitas do tipo debt_recovery ainda não recebidas)
+  const pendingDebtRecovery = incomes
+    .filter((i) => i.incomeSourceId === resolvedDebtSource.id &&
+      (i.status === "expected" || i.status === "partial"))
+    .reduce((acc, i) => acc + (i.expectedAmount - i.receivedAmount), 0);
+
+  // Dinheiro na Mesa = comissões abertas + dívidas a receber + empresa te deve
+  const moneyOnTable = pendingCommissions + pendingDebtRecovery + pendingSalaryBalance;
+
   const receivedCommissionsThisMonth = incomes
     .filter((i) => commissionSourceIds.has(i.incomeSourceId))
     .reduce((acc, i) => acc + i.receivedAmount, 0);
@@ -332,6 +341,8 @@ export async function getDashboardData(year: number, month: number, userId: stri
       pendingCommissions: pendingCommissions / 100,
       receivedCommissionsThisMonth: receivedCommissionsThisMonth / 100,
       pendingSalaryBalance: pendingSalaryBalance / 100,
+      pendingDebtRecovery: pendingDebtRecovery / 100,
+      moneyOnTable: moneyOnTable / 100,
       estimatedFreeBalance: (totalRecurringIncome - totalRecurringExpense) / 100,
       netWorth: netWorth / 100,
       totalAssets: totalAssets / 100,

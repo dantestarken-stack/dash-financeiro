@@ -459,16 +459,22 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                       icon="business_center" 
                       color="warning" 
                     />
-                    <KpiCard 
-                      title="Projeção Final" 
-                      titleTooltip="Saldo Hoje + Tudo que falta entrar − Tudo que falta pagar"
-                      value={`R$ ${kpis.projectedBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-                      trend="Se receber tudo e pagar tudo" 
-                      icon="query_stats" 
-                      color={kpis.projectedBalance >= 0 ? "success" : "danger"}
+                    <KpiCard
+                      title="Dinheiro na Mesa"
+                      titleTooltip="Comissões abertas + Dívidas a receber + Salário que a empresa te deve"
+                      value={`R$ ${kpis.moneyOnTable.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                      trend={(() => {
+                        const parts = [];
+                        if (kpis.pendingCommissions > 0) parts.push(`Comissões R$ ${kpis.pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`);
+                        if (kpis.pendingDebtRecovery > 0) parts.push(`Dívidas R$ ${kpis.pendingDebtRecovery.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`);
+                        if (kpis.pendingSalaryBalance > 0) parts.push(`Empresa R$ ${kpis.pendingSalaryBalance.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`);
+                        return parts.length > 0 ? parts.join(' · ') : 'Nada pendente';
+                      })()}
+                      icon="payments"
+                      color={kpis.moneyOnTable > 0 ? "warning" : "success"}
                       onClick={() => {
-                        setActiveTab("agenda");
-                        setStatusFilter("pending");
+                        setActiveTab("receitas");
+                        setStatusFilter("expected");
                         setGlobalSearch("");
                       }}
                     />
