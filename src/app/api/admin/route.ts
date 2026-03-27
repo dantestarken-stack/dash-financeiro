@@ -11,7 +11,13 @@ export async function GET(req: NextRequest) {
     const action = req.nextUrl.searchParams.get("action") || "read";
     const users = await prisma.user.findMany({ select: { id: true, name: true, email: true } });
     if (!users.length) return NextResponse.json({ error: "no users" });
-    const userId = users[0].id;
+
+    // Find the user that actually has accounts (not just users[0])
+    let userId = users[0].id;
+    for (const u of users) {
+        const count = await prisma.account.count({ where: { userId: u.id } });
+        if (count > 0) { userId = u.id; break; }
+    }
 
     // ── Fix R$330 phantom balance ─────────────────────────────────────────────
     if (action === "fix330") {
