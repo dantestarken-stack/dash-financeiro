@@ -43,6 +43,7 @@ export interface Transaction {
   date: string;
   displayDate: string | null;
   status: TransactionStatus;
+  receivedAmount?: number;
   nature?: string;
   categoryId?: string;
   incomeSourceId?: string;

@@ -777,8 +777,13 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                       </div>
                     );
 
-                    const totalPending = pending.reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
-                    const totalReceived = received.reduce((s: number, t: any) => s + Math.abs(t.amount), 0);
+                    // For partial incomes: only count the remaining (amount - receivedAmount)
+                    const totalPending = pending.reduce((s: number, t: any) =>
+                      s + (Math.abs(t.amount) - (t.receivedAmount ?? 0)), 0);
+                    // Received = fully received + already-received portion of partial incomes
+                    const alreadyPartial = pending.reduce((s: number, t: any) =>
+                      s + (t.receivedAmount ?? 0), 0);
+                    const totalReceived = received.reduce((s: number, t: any) => s + Math.abs(t.amount), 0) + alreadyPartial;
                     const totalAll = totalPending + totalReceived;
                     const receivedPct = totalAll > 0 ? (totalReceived / totalAll) * 100 : 0;
 

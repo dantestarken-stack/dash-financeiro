@@ -241,6 +241,7 @@ export async function getDashboardData(year: number, month: number, userId: stri
         id: i.id,
         name: i.title,
         amount: (i.expectedAmount || i.receivedAmount) / 100,
+        receivedAmount: i.receivedAmount / 100,
         type: "income" as const,
         date: (effectiveDueDate ?? i.competencyDate).toISOString(),
         displayDate: effectiveDueDate ? formatDisplayDate(effectiveDueDate) : null,
