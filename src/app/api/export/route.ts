@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
   const header = ["Data", "Tipo", "Título", "Categoria/Fonte", "Valor (R$)", "Status", "Natureza", "Notas"].join(",");
   rows.push(header);
 
-  function formatDate(date: Date): string {
+  function formatDate(date: Date | null): string {
+    if (!date) return "Sem prazo";
     return new Date(date.getTime() + date.getTimezoneOffset() * 60000).toLocaleDateString("pt-BR");
   }
 
