@@ -39,7 +39,7 @@ export interface Transaction {
   amount: number;
   type: "income" | "expense";
   date: string;
-  displayDate: string;
+  displayDate: string | null;
   status: TransactionStatus;
   nature?: string;
   categoryId?: string;

@@ -151,7 +151,9 @@ export async function getDashboardData(year: number, month: number, userId: stri
   incomes.forEach((i) => {
     actualIncome += i.receivedAmount;
     if (i.status === "expected" || i.status === "partial") {
-      remainingIncome += i.expectedAmount - i.receivedAmount;
+      // Exclude incomes with no deadline (null or sentinel year 2099+)
+      const hasDeadline = i.dueDate && i.dueDate.getFullYear() < 2099;
+      if (hasDeadline) remainingIncome += i.expectedAmount - i.receivedAmount;
     }
   });
 
@@ -223,20 +225,24 @@ export async function getDashboardData(year: number, month: number, userId: stri
       isRecurring: e.isRecurring,
       attachmentUrl: attachmentMap.get(e.id),
     })),
-    ...incomes.map((i) => ({
-      id: i.id,
-      name: i.title,
-      amount: (i.expectedAmount || i.receivedAmount) / 100,
-      type: "income" as const,
-      date: i.dueDate.toISOString(),
-      displayDate: formatDisplayDate(i.dueDate),
-      status: i.status as TransactionStatus,
-      incomeSourceId: i.incomeSourceId,
-      isDebtRecovery: i.incomeSourceId === resolvedDebtSource.id,
-      notes: i.notes,
-      isRecurring: i.isRecurring,
-      attachmentUrl: attachmentMap.get(i.id),
-    })),
+    ...incomes.map((i) => {
+      // dueDate may be null (no deadline) or sentinel 2099 — use competencyDate as fallback for display
+      const effectiveDueDate = (i.dueDate && i.dueDate.getFullYear() < 2099) ? i.dueDate : null;
+      return {
+        id: i.id,
+        name: i.title,
+        amount: (i.expectedAmount || i.receivedAmount) / 100,
+        type: "income" as const,
+        date: (effectiveDueDate ?? i.competencyDate).toISOString(),
+        displayDate: effectiveDueDate ? formatDisplayDate(effectiveDueDate) : null,
+        status: i.status as TransactionStatus,
+        incomeSourceId: i.incomeSourceId,
+        isDebtRecovery: i.incomeSourceId === resolvedDebtSource.id,
+        notes: i.notes,
+        isRecurring: i.isRecurring,
+        attachmentUrl: attachmentMap.get(i.id),
+      };
+    }),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // ── Últimas 5 transações globais ─────────────────────────────────────────

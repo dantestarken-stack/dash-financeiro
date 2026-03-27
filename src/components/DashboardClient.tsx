@@ -2095,7 +2095,7 @@ function TransactionRow({ t, payingId, deletingId, handleMarkPaid, handleDelete,
                : t.status === 'partial' ? 'Parcial'
                : 'Pendente'}
             </span>
-            <span className="text-xs font-bold text-slate-500">Vence {t.displayDate}</span>
+            {t.displayDate && <span className="text-xs font-bold text-slate-500">Vence {t.displayDate}</span>}
             {t.status === 'partial' && t.type === 'income' && (
               <span className="text-[10px] text-primary font-bold">Saldo pendente</span>
             )}

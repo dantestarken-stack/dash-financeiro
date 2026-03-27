@@ -365,8 +365,10 @@ export async function updateTransaction(
         if (data.notes !== undefined) updateData.notes = data.notes;
         if (data.date !== undefined) {
             if (data.date === "") {
-                // User cleared the date — remove dueDate (keep competencyDate as-is)
-                updateData.dueDate = null;
+                // User cleared the date — use far-future sentinel (2099-12-31)
+                // so the income won't appear in any real month projection
+                // (migration to allow true null is also deployed in parallel)
+                updateData.dueDate = new Date(Date.UTC(2099, 11, 31));
             } else {
                 const d = new Date(data.date);
                 updateData.dueDate = d;
