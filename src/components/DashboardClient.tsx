@@ -467,7 +467,8 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                         const parts = [];
                         if (kpis.pendingCommissions > 0) parts.push(`Comissões R$ ${kpis.pendingCommissions.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`);
                         if (kpis.pendingDebtRecovery > 0) parts.push(`Dívidas R$ ${kpis.pendingDebtRecovery.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`);
-                        if (kpis.pendingSalaryBalance > 0) parts.push(`Empresa R$ ${kpis.pendingSalaryBalance.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`);
+                        if (kpis.pendingSalaryBalance > 0) parts.push(`Salário R$ ${kpis.pendingSalaryBalance.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`);
+                        if (kpis.pendingReimbursements > 0) parts.push(`Reembolsos R$ ${kpis.pendingReimbursements.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`);
                         return parts.length > 0 ? parts.join(' · ') : 'Nada pendente';
                       })()}
                       icon="payments"
@@ -1650,6 +1651,15 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                   <input type="checkbox" name="isPaid" value="true" id="isPaid" className="w-5 h-5 rounded border-white/10 bg-white/5 text-primary focus:ring-primary focus:ring-offset-0" />
                   <label htmlFor="isPaid" className="text-sm font-bold text-slate-300">Marcar como {txType === 'expense' ? 'Pago' : 'Recebido'} agora {isInstallment ? '(Apenas 1ª parcela)' : ''}</label>
                 </div>
+                {txType === 'expense' && (
+                  <div className="flex items-center gap-3 bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20">
+                    <input type="checkbox" name="chargeCompany" value="true" id="chargeCompany" className="w-5 h-5 rounded border-amber-500/30 bg-white/5 text-amber-500 focus:ring-amber-500 focus:ring-offset-0" />
+                    <div>
+                      <label htmlFor="chargeCompany" className="text-sm font-bold text-amber-400 cursor-pointer">💼 Cobrar da empresa</label>
+                      <p className="text-[10px] text-amber-600 mt-0.5">Gera um reembolso pendente no "Dinheiro na Mesa"</p>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-4 pt-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 h-12 rounded-xl text-sm font-bold text-slate-500 hover:text-white transition-colors">Cancelar</button>

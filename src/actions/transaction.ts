@@ -40,6 +40,7 @@ export async function createTransaction(formData: FormData) {
     }
 
     const totalAmountCentavos = parseCentavos(formData.get("amount") as string);
+    const chargeCompany = formData.get("chargeCompany") === "true"; // Cobrar da empresa (gera reembolso pendente)
 
     let dueDate: Date;
     if (dueDateStr) {
@@ -247,6 +248,45 @@ export async function createTransaction(formData: FormData) {
                 }
             });
         }
+    }
+
+    // ── REEMBOLSO EMPRESA ─────────────────────────────────────────────────────
+    // When chargeCompany=true on an expense, auto-create a pending income so
+    // the reimbursement shows up in "Dinheiro na Mesa".
+    if (chargeCompany && type === "expense" && accountId) {
+        // Find or create the "Reembolso Empresa" income source
+        let reimbursementSource = await prisma.incomeSource.findFirst({
+            where: { userId, type: "reimbursement" },
+        });
+        if (!reimbursementSource) {
+            reimbursementSource = await prisma.incomeSource.create({
+                data: {
+                    userId,
+                    name: "Reembolso Empresa",
+                    type: "reimbursement",
+                    isActive: true,
+                },
+            });
+        }
+        // Competency = current month (reimbursement has no fixed deadline)
+        const now = new Date();
+        const reimbCompetency = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const sentinelDate = new Date(Date.UTC(2099, 11, 31)); // no deadline
+        await prisma.income.create({
+            data: {
+                userId,
+                accountId,
+                incomeSourceId: reimbursementSource.id,
+                title: `Reembolso - ${title}`,
+                expectedAmount: totalAmountCentavos,
+                receivedAmount: 0,
+                type: "reimbursement",
+                status: "expected",
+                dueDate: sentinelDate,
+                competencyDate: reimbCompetency,
+                notes: `Gerado automaticamente ao lançar despesa "${title}"`,
+            },
+        });
     }
 
     revalidatePath("/");

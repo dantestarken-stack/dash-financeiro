@@ -188,8 +188,14 @@ export async function getDashboardData(year: number, month: number, userId: stri
       (i.status === "expected" || i.status === "partial"))
     .reduce((acc, i) => acc + (i.expectedAmount - i.receivedAmount), 0);
 
-  // Dinheiro na Mesa = comissões abertas + dívidas a receber + empresa te deve
-  const moneyOnTable = pendingCommissions + pendingDebtRecovery + pendingSalaryBalance;
+  // Reembolsos pendentes (despesas pagas do bolso que a empresa ainda não reembolsou)
+  const pendingReimbursements = incomes
+    .filter((i) => i.type === "reimbursement" &&
+      (i.status === "expected" || i.status === "partial"))
+    .reduce((acc, i) => acc + (i.expectedAmount - i.receivedAmount), 0);
+
+  // Dinheiro na Mesa = comissões abertas + dívidas a receber + empresa te deve + reembolsos
+  const moneyOnTable = pendingCommissions + pendingDebtRecovery + pendingSalaryBalance + pendingReimbursements;
 
   const receivedCommissionsThisMonth = incomes
     .filter((i) => commissionSourceIds.has(i.incomeSourceId))
@@ -344,6 +350,7 @@ export async function getDashboardData(year: number, month: number, userId: stri
       receivedCommissionsThisMonth: receivedCommissionsThisMonth / 100,
       pendingSalaryBalance: pendingSalaryBalance / 100,
       pendingDebtRecovery: pendingDebtRecovery / 100,
+      pendingReimbursements: pendingReimbursements / 100,
       moneyOnTable: moneyOnTable / 100,
       estimatedFreeBalance: (totalRecurringIncome - totalRecurringExpense) / 100,
       netWorth: netWorth / 100,

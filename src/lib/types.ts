@@ -18,6 +18,7 @@ export interface KPIs {
   totalLiabilities: number;
   pendingSalaryBalance: number;
   pendingDebtRecovery: number;
+  pendingReimbursements: number;
   moneyOnTable: number;
 }
 
