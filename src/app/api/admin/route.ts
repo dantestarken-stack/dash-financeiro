@@ -40,17 +40,20 @@ export async function GET(req: NextRequest) {
         const firstDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
         const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
 
-        const salaryIncome = await prisma.income.findFirst({
-            where: {
-                userId,
-                deletedAt: null,
-                status: "received",
-                competencyDate: { gte: firstDay, lte: lastDay },
-                title: { contains: "alar", mode: "insensitive" } // matches "Salário Fixo"
-            }
-        });
+        // Support direct ID lookup or fall back to source type search
+        const incomeId = req.nextUrl.searchParams.get("id");
+        const salaryIncome = incomeId
+            ? await prisma.income.findUnique({ where: { id: incomeId } })
+            : await prisma.income.findFirst({
+                where: {
+                    userId, deletedAt: null,
+                    competencyDate: { gte: firstDay, lte: lastDay },
+                    incomeSource: { type: "salary" }
+                },
+                include: { incomeSource: true }
+            });
 
-        if (!salaryIncome) return NextResponse.json({ error: "Salary income not found for this month", hint: "Check the read action to see all incomes" });
+        if (!salaryIncome) return NextResponse.json({ error: "Income not found", hint: "Pass &id=<income_id> from the read action" });
 
         const previouslyReceived = salaryIncome.receivedAmount;
         const diff = previouslyReceived - amountReceived; // amount to deduct from account
