@@ -364,9 +364,14 @@ export async function updateTransaction(
         if (data.title !== undefined) updateData.title = data.title;
         if (data.notes !== undefined) updateData.notes = data.notes;
         if (data.date !== undefined) {
-            const d = new Date(data.date);
-            updateData.dueDate = d;
-            updateData.competencyDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+            if (data.date === "") {
+                // User cleared the date — remove dueDate (keep competencyDate as-is)
+                updateData.dueDate = null;
+            } else {
+                const d = new Date(data.date);
+                updateData.dueDate = d;
+                updateData.competencyDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+            }
         }
 
         if (data.amount !== undefined && data.amount !== existing.expectedAmount) {

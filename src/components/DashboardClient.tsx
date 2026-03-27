@@ -180,12 +180,14 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
     const amountCentavos = amountStr
       ? Math.round(parseFloat(amountStr.replace(/\./g, "").replace(",", ".")) * 100)
       : undefined;
+    const dateValue = form.get("date") as string;
     await updateTransaction(editingTx.id, editingTx.type, {
       title: form.get("title") as string || undefined,
       notes: (form.get("notes") as string) || undefined,
       nature: editingTx.type === "expense" ? (form.get("nature") as string) || undefined : undefined,
       categoryId: editingTx.type === "expense" ? (form.get("categoryId") as string) || undefined : undefined,
-      date: (form.get("date") as string) || undefined,
+      // For incomes: send empty string explicitly so the server can set dueDate = null
+      date: editingTx.type === "income" ? dateValue : (dateValue || undefined),
       amount: amountCentavos,
     });
     setIsSavingTx(false);
