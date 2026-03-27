@@ -423,7 +423,8 @@ export async function deleteTransaction(id: string, type: "income" | "expense") 
             const doc = await tx.income.findUnique({ where: { id, userId } });
             if (!doc || doc.deletedAt) return;
 
-            if (doc.status === "received" && doc.accountId) {
+            // Reverse any amount already credited (received or partial)
+            if ((doc.status === "received" || doc.status === "partial") && doc.accountId && doc.receivedAmount > 0) {
                 await tx.account.update({
                     where: { id: doc.accountId },
                     data: { currentBalance: { decrement: doc.receivedAmount } }
