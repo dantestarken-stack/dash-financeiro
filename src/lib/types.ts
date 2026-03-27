@@ -50,6 +50,7 @@ export interface Transaction {
   categoryId?: string;
   incomeSourceId?: string;
   isDebtRecovery?: boolean;
+  isReimbursement?: boolean;
   isRecurring?: boolean;
   notes?: string | null;
   attachmentUrl?: string;

@@ -446,6 +446,67 @@ export async function updateTransaction(
     return { success: true };
 }
 
+// ─── abateReimbursement ──────────────────────────────────────────────────────
+// Marks a reimbursement income as received AND registers the same amount as a
+// commission receipt — so the commission radar also decreases accordingly.
+
+export async function abateReimbursement(id: string) {
+    const userId = await requireUserId();
+
+    await prisma.$transaction(async (tx) => {
+        // 1. Find the reimbursement income
+        const reimb = await tx.income.findUnique({ where: { id, userId } });
+        if (!reimb || reimb.type !== "reimbursement") throw new Error("Reembolso não encontrado.");
+        if (reimb.status === "received") throw new Error("Reembolso já foi baixado.");
+
+        const remaining = reimb.expectedAmount - reimb.receivedAmount;
+
+        // 2. Mark reimbursement as received + credit bank account
+        await tx.income.update({
+            where: { id },
+            data: {
+                status: "received",
+                receivedAmount: reimb.expectedAmount,
+                receivedDate: new Date(),
+            },
+        });
+        if (reimb.accountId) {
+            await tx.account.update({
+                where: { id: reimb.accountId },
+                data: { currentBalance: { increment: remaining } },
+            });
+        }
+
+        // 3. Find the first commission income source for this user
+        const commissionSource = await tx.incomeSource.findFirst({
+            where: { userId, type: "commission" },
+        });
+        if (!commissionSource) return; // no commission source → skip step 3
+
+        // 4. Create a commission receipt that reduces the commission radar balance
+        const now = new Date();
+        await tx.income.create({
+            data: {
+                userId,
+                accountId: reimb.accountId,
+                incomeSourceId: commissionSource.id,
+                title: `Abatimento - ${reimb.title.replace("Reembolso - ", "")}`,
+                expectedAmount: 0,
+                receivedAmount: remaining,
+                type: "commission",
+                status: "received",
+                dueDate: new Date(Date.UTC(2099, 11, 31)),
+                competencyDate: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
+                receivedDate: new Date(),
+                notes: `Abatido das comissões via reembolso "${reimb.title}"`,
+            },
+        });
+    });
+
+    revalidatePath("/");
+    return { success: true };
+}
+
 // ─── deleteTransaction ────────────────────────────────────────────────────────
 
 export async function deleteTransaction(id: string, type: "income" | "expense") {

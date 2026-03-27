@@ -248,7 +248,8 @@ export async function getDashboardData(year: number, month: number, userId: stri
         name: i.title,
         amount: (i.expectedAmount || i.receivedAmount) / 100,
         receivedAmount: i.receivedAmount / 100,
-        hasDeadline: effectiveDueDate !== null, // false = sem prazo definido (não entra nos totais do período)
+        hasDeadline: effectiveDueDate !== null,
+        isReimbursement: i.type === "reimbursement",
         type: "income" as const,
         date: (effectiveDueDate ?? i.competencyDate).toISOString(),
         displayDate: effectiveDueDate ? formatDisplayDate(effectiveDueDate) : null,
