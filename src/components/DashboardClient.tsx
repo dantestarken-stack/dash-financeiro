@@ -122,6 +122,15 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
     setDrillDown({ title: "Todas as Saídas do Mês", items });
   }
 
+  function openBalanceDrillDown() {
+    // Todas as transações que efetivamente movimentaram o saldo da conta
+    const items = allTransactions.filter((t: any) =>
+      (t.type === "income" && (t.status === "received" || t.status === "partial")) ||
+      (t.type === "expense" && t.status === "paid")
+    ).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setDrillDown({ title: "Movimentações que formam o saldo", items });
+  }
+
   // Report states
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
@@ -425,18 +434,14 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                 <div className="space-y-2">
                   <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 ml-1">📍 Situação Atual</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <KpiCard 
-                      title="Dinheiro no Banco" 
-                      titleTooltip="Seu saldo real na conta hoje"
-                      value={`R$ ${kpis.accountBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-                      trend="Saldo atual em conta" 
-                      icon="account_balance" 
-                      color="primary" 
-                      onClick={() => {
-                        setActiveTab("agenda");
-                        setStatusFilter("all");
-                        setGlobalSearch("");
-                      }}
+                    <KpiCard
+                      title="Dinheiro no Banco"
+                      titleTooltip="Clique para ver todas as movimentações que formam este saldo"
+                      value={`R$ ${kpis.accountBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                      trend="Saldo atual em conta"
+                      icon="account_balance"
+                      color="primary"
+                      onClick={() => openBalanceDrillDown()}
                     />
                     <KpiCard 
                       title="Falta da Empresa" 
@@ -1797,37 +1802,75 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
             {drillDown.items.length === 0 ? (
               <div className="text-center py-12 text-slate-500 italic text-sm">Nenhum lançamento encontrado.</div>
             ) : (
-              <div className="overflow-y-auto space-y-2 pr-1">
-                {drillDown.items
-                  .sort((a: any, b: any) => Math.abs(b.amount) - Math.abs(a.amount))
-                  .map((item: any) => (
-                    <div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${editingItem?.id === item.id ? 'bg-primary/5 border-primary/20' : 'bg-white/5 border-white/5'}`}>
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${item.status === 'paid' || item.status === 'received' ? 'bg-danger/10' : 'bg-slate-700'}`}>
-                          <span className="material-symbols-outlined text-sm text-danger">receipt_long</span>
+              (() => {
+                const isBalanceView = drillDown.title === "Movimentações que formam o saldo";
+                const sorted = isBalanceView
+                  ? [...drillDown.items].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  : [...drillDown.items].sort((a: any, b: any) => Math.abs(b.amount) - Math.abs(a.amount));
+                const netBalance = isBalanceView
+                  ? drillDown.items.reduce((acc: number, t: any) => t.type === "income" ? acc + Math.abs(t.amount) : acc - Math.abs(t.amount), 0)
+                  : null;
+                return (
+                  <div className="overflow-y-auto space-y-2 pr-1">
+                    {sorted.map((item: any) => {
+                      const isIncome = item.type === "income";
+                      return (
+                        <div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${editingItem?.id === item.id ? 'bg-primary/5 border-primary/20' : 'bg-white/5 border-white/5'}`}>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isIncome ? 'bg-success/10' : 'bg-danger/10'}`}>
+                              <span className={`material-symbols-outlined text-sm ${isIncome ? 'text-success' : 'text-danger'}`}>
+                                {isIncome ? 'arrow_downward' : 'arrow_upward'}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-white leading-tight truncate">{item.name}</p>
+                              <p className="text-[10px] text-slate-500">
+                                {item.displayDate}
+                                {item.nature && <span className="text-slate-600"> · {item.nature === 'essential' ? 'Essencial' : item.nature === 'important' ? 'Importante' : 'Supérfluo'}</span>}
+                              </p>
+                              {item.notes && <p className="text-[10px] text-slate-600 italic mt-0.5 truncate">{item.notes}</p>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-3">
+                            <span className={`text-sm font-black ${isIncome ? 'text-success' : 'text-danger'}`}>
+                              {isIncome ? '+' : '-'} R$ {Math.abs(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                            {item.type === "expense" && (
+                              <button onClick={() => setEditingItem(editingItem?.id === item.id ? null : item)}
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${editingItem?.id === item.id ? 'bg-primary text-white' : 'bg-white/5 text-slate-500 hover:text-white hover:bg-white/10'}`}>
+                                <span className="material-symbols-outlined text-sm">edit</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-white leading-tight truncate">{item.name}</p>
-                          <p className="text-[10px] text-slate-500">{item.displayDate} · <span className={`font-bold ${item.status === 'paid' ? 'text-success' : 'text-warning'}`}>{item.status === 'paid' ? 'Pago' : item.status === 'pending' ? 'Pendente' : item.status}</span> {item.nature && <span className="text-slate-600">· {item.nature === 'essential' ? 'Essencial' : item.nature === 'important' ? 'Importante' : 'Supérfluo'}</span>}</p>
-                          {item.notes && <p className="text-[10px] text-slate-600 italic mt-0.5 truncate">{item.notes}</p>}
+                      );
+                    })}
+                    <div className="pt-3 border-t border-white/5 shrink-0 space-y-1">
+                      {isBalanceView ? (
+                        <>
+                          <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            <span>Entradas</span>
+                            <span className="text-success">+ R$ {drillDown.items.filter((t:any)=>t.type==="income").reduce((a:number,t:any)=>a+Math.abs(t.amount),0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                            <span>Saídas</span>
+                            <span className="text-danger">- R$ {drillDown.items.filter((t:any)=>t.type==="expense").reduce((a:number,t:any)=>a+Math.abs(t.amount),0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+                          </div>
+                          <div className="flex justify-between text-xs font-black uppercase tracking-widest pt-1 border-t border-white/5">
+                            <span className="text-slate-400">Saldo</span>
+                            <span className={netBalance! >= 0 ? 'text-success' : 'text-danger'}>R$ {netBalance!.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between text-xs font-black uppercase tracking-widest">
+                          <span className="text-slate-500">Total</span>
+                          <span className="text-white">R$ {drillDown.items.reduce((acc:number,t:any)=>acc+Math.abs(t.amount),0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0 ml-3">
-                        <span className="text-sm font-black text-danger">R$ {Math.abs(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        {item.type === "expense" && (
-                          <button onClick={() => setEditingItem(editingItem?.id === item.id ? null : item)}
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${editingItem?.id === item.id ? 'bg-primary text-white' : 'bg-white/5 text-slate-500 hover:text-white hover:bg-white/10'}`}>
-                            <span className="material-symbols-outlined text-sm">edit</span>
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
-                  ))}
-                <div className="pt-3 border-t border-white/5 flex justify-between text-xs font-black uppercase tracking-widest shrink-0">
-                  <span className="text-slate-500">Total</span>
-                  <span className="text-white">R$ {drillDown.items.reduce((acc: number, t: any) => acc + Math.abs(t.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-              </div>
+                  </div>
+                );
+              })()
             )}
           </div>
         </div>
