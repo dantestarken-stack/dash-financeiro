@@ -523,6 +523,37 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                   </div>
                 </div>
 
+                {/* ═══════ SEÇÃO 2.5: SALÁRIO A RECEBER DA EMPRESA ═══════ */}
+                {kpis.pendingSalaryBalance > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 ml-1">💼 Empresa te Deve</h3>
+                    <div
+                      onClick={() => {
+                        setActiveTab("incomes");
+                        setStatusFilter("all");
+                        setGlobalSearch("Salário");
+                      }}
+                      className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-warning/20 to-slate-900 border border-warning/20 p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 transition-all hover:border-warning/40 shadow-2xl cursor-pointer active:scale-[0.99]"
+                    >
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-warning/10 blur-[100px] -z-10 group-hover:bg-warning/20 transition-colors"></div>
+                      <div>
+                        <h2 className="text-2xl font-black text-white flex items-center tracking-tight">
+                          <span className="material-symbols-outlined text-warning text-3xl mr-3">account_balance_wallet</span>
+                          Salário a Receber
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-2 font-medium">
+                          Saldo acumulado de salário que a empresa ainda te deve.<br/>
+                          <span className="text-warning/80 text-xs">Clique para ver os meses em aberto.</span>
+                        </p>
+                      </div>
+                      <div className="bg-white/5 border border-warning/20 rounded-2xl px-8 py-5 backdrop-blur-md shrink-0">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-warning">Total Acumulado</span>
+                        <div className="text-4xl font-black text-white mt-1">R$ {kpis.pendingSalaryBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* ═══════ SEÇÃO 3: COMISSÕES ═══════ */}
                 <div className="space-y-2">
                   <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 ml-1">🎯 Comissões</h3>

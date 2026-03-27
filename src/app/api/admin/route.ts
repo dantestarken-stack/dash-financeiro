@@ -9,28 +9,76 @@ export async function GET(req: NextRequest) {
     }
 
     const action = req.nextUrl.searchParams.get("action") || "read";
-
     const users = await prisma.user.findMany({ select: { id: true, name: true, email: true } });
     if (!users.length) return NextResponse.json({ error: "no users" });
     const userId = users[0].id;
 
+    // ── Fix R$330 phantom balance ─────────────────────────────────────────────
     if (action === "fix330") {
-        // Fix the R$330 phantom balance from the deleted partial income
         const accounts = await prisma.account.findMany({ where: { userId } });
         if (!accounts.length) return NextResponse.json({ error: "no accounts" });
         const account = accounts[0];
         await prisma.account.update({
             where: { id: account.id },
-            data: { currentBalance: { decrement: 33000 } } // deduct R$330 in centavos
+            data: { currentBalance: { decrement: 33000 } }
         });
         const updated = await prisma.account.findUnique({ where: { id: account.id } });
+        return NextResponse.json({ ok: true, action: "fix330", newBalance: (updated!.currentBalance / 100).toFixed(2) });
+    }
+
+    // ── Fix salary: mark as partial (3000 received, 500 pending) ─────────────
+    if (action === "fixSalary") {
+        const amountReceived = parseInt(req.nextUrl.searchParams.get("received") || "300000"); // centavos
+        // Find the salary income for current month
+        const now = new Date();
+        const firstDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+
+        const salaryIncome = await prisma.income.findFirst({
+            where: {
+                userId,
+                deletedAt: null,
+                status: "received",
+                competencyDate: { gte: firstDay, lte: lastDay },
+                title: { contains: "alar", mode: "insensitive" } // matches "Salário Fixo"
+            }
+        });
+
+        if (!salaryIncome) return NextResponse.json({ error: "Salary income not found for this month", hint: "Check the read action to see all incomes" });
+
+        const previouslyReceived = salaryIncome.receivedAmount;
+        const diff = previouslyReceived - amountReceived; // amount to deduct from account
+
+        await prisma.$transaction(async (tx) => {
+            await tx.income.update({
+                where: { id: salaryIncome.id },
+                data: {
+                    status: amountReceived >= salaryIncome.expectedAmount ? "received" : "partial",
+                    receivedAmount: amountReceived,
+                }
+            });
+            if (diff > 0 && salaryIncome.accountId) {
+                await tx.account.update({
+                    where: { id: salaryIncome.accountId },
+                    data: { currentBalance: { decrement: diff } }
+                });
+            }
+        });
+
+        const account = await prisma.account.findUnique({ where: { id: salaryIncome.accountId! } });
         return NextResponse.json({
             ok: true,
-            message: "Subtracted R$330 from account balance",
-            newBalance: (updated!.currentBalance / 100).toFixed(2)
+            action: "fixSalary",
+            income: salaryIncome.title,
+            expected: salaryIncome.expectedAmount / 100,
+            previouslyReceived: previouslyReceived / 100,
+            nowReceived: amountReceived / 100,
+            accountAdjustment: -diff / 100,
+            newAccountBalance: account ? account.currentBalance / 100 : "unknown"
         });
     }
 
+    // ── Read all data ─────────────────────────────────────────────────────────
     const [accounts, incomes, expenses] = await Promise.all([
         prisma.account.findMany({ where: { userId } }),
         prisma.income.findMany({
@@ -49,9 +97,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
         users: users.map(u => ({ id: u.id, name: u.name })),
-        accounts: accounts.map(a => ({
-            id: a.id, name: a.name, balance: a.currentBalance / 100,
-        })),
+        accounts: accounts.map(a => ({ id: a.id, name: a.name, balance: a.currentBalance / 100 })),
         incomes: incomes.map(i => ({
             id: i.id, title: i.title,
             source: i.incomeSource?.name, sourceType: i.incomeSource?.type,

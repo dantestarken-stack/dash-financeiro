@@ -16,6 +16,7 @@ export interface KPIs {
   netWorth: number;
   totalAssets: number;
   totalLiabilities: number;
+  pendingSalaryBalance: number;
 }
 
 export interface SpentByNature {

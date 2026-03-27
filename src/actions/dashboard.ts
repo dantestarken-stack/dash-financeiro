@@ -46,6 +46,11 @@ export async function getDashboardData(year: number, month: number, userId: stri
     incomeSources.filter((s) => s.type === "commission").map((s) => s.id)
   );
 
+  // IDs das fontes do tipo "salary"
+  const salarySourceIds = new Set(
+    incomeSources.filter((s) => s.type === "salary" || s.name.toLowerCase().includes("salário") || s.name.toLowerCase().includes("salario")).map((s) => s.id)
+  );
+
   // Garante que a fonte "Recebimento de Dívida" existe
   let debtRecoverySource = incomeSources.find((s) => s.name === "Recebimento de Dívida");
   if (!debtRecoverySource) {
@@ -70,6 +75,7 @@ export async function getDashboardData(year: number, month: number, userId: stri
     expenses,
     attachments,
     allCommissionsData,
+    allSalaryData,
     futureIncomes,
     recentExp,
     recentInc,
@@ -92,6 +98,10 @@ export async function getDashboardData(year: number, month: number, userId: stri
     // Todas as comissões (para cálculo de pendências globais)
     prisma.income.findMany({
       where: { userId, deletedAt: null, incomeSourceId: { in: [...commissionSourceIds] } },
+    }),
+    // Todos os salários (para cálculo de saldo acumulado a receber)
+    prisma.income.findMany({
+      where: { userId, deletedAt: null, incomeSourceId: { in: [...salarySourceIds] } },
     }),
     // Comissões futuras
     prisma.income.findMany({
@@ -163,6 +173,12 @@ export async function getDashboardData(year: number, month: number, userId: stri
   const totalExpectedComm = allCommissionsData.reduce((acc, c) => acc + c.expectedAmount, 0);
   const totalReceivedComm = allCommissionsData.reduce((acc, c) => acc + c.receivedAmount, 0);
   const pendingCommissions = Math.max(0, totalExpectedComm - totalReceivedComm);
+
+  // Saldo acumulado de salário a receber da empresa (soma de todos os meses com saldo não recebido)
+  const pendingSalaryBalance = allSalaryData.reduce((acc, s) => {
+    const remaining = s.expectedAmount - s.receivedAmount;
+    return remaining > 0 ? acc + remaining : acc;
+  }, 0);
 
   const receivedCommissionsThisMonth = incomes
     .filter((i) => commissionSourceIds.has(i.incomeSourceId))
@@ -306,6 +322,7 @@ export async function getDashboardData(year: number, month: number, userId: stri
       projectedBalance: projectedBalance / 100,
       pendingCommissions: pendingCommissions / 100,
       receivedCommissionsThisMonth: receivedCommissionsThisMonth / 100,
+      pendingSalaryBalance: pendingSalaryBalance / 100,
       estimatedFreeBalance: (totalRecurringIncome - totalRecurringExpense) / 100,
       netWorth: netWorth / 100,
       totalAssets: totalAssets / 100,
