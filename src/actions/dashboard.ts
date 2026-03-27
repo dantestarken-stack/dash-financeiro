@@ -258,16 +258,19 @@ export async function getDashboardData(year: number, month: number, userId: stri
       status: e.status as TransactionStatus,
       createdAt: e.createdAt,
     })),
-    ...recentInc.map((i) => ({
-      id: i.id,
-      name: i.title,
-      amount: i.expectedAmount / 100,
-      type: "income" as const,
-      date: i.dueDate.toISOString(),
-      displayDate: formatDisplayDate(i.dueDate),
-      status: i.status as TransactionStatus,
-      createdAt: i.createdAt,
-    })),
+    ...recentInc.map((i) => {
+      const effDate = (i.dueDate && i.dueDate.getFullYear() < 2099) ? i.dueDate : null;
+      return {
+        id: i.id,
+        name: i.title,
+        amount: i.expectedAmount / 100,
+        type: "income" as const,
+        date: (effDate ?? i.competencyDate).toISOString(),
+        displayDate: effDate ? formatDisplayDate(effDate) : null,
+        status: i.status as TransactionStatus,
+        createdAt: i.createdAt,
+      };
+    }),
   ]
     .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
     .slice(0, 5);
@@ -426,11 +429,9 @@ export async function materializeRecurringTransactions(
       });
       if (!exists) {
         const tpl = rule.incomes[0];
-        const newDueDate = new Date(
-          targetMonthDate.getFullYear(),
-          targetMonthDate.getMonth(),
-          tpl.dueDate.getDate()
-        );
+        const newDueDate = tpl.dueDate
+          ? new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), tpl.dueDate.getDate())
+          : new Date(Date.UTC(targetMonthDate.getFullYear(), targetMonthDate.getMonth() + 1, 0)); // last day of month
         await prisma.income.create({
           data: {
             userId,
