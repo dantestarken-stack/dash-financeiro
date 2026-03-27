@@ -44,6 +44,7 @@ export interface Transaction {
   displayDate: string | null;
   status: TransactionStatus;
   receivedAmount?: number;
+  hasDeadline?: boolean;
   nature?: string;
   categoryId?: string;
   incomeSourceId?: string;

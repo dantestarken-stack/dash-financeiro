@@ -777,15 +777,17 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                       </div>
                     );
 
-                    // For partial incomes: only count the remaining (amount - receivedAmount)
-                    const totalPending = pending.reduce((s: number, t: any) =>
+                    // Totals only count incomes WITH a real deadline in this period
+                    // No-deadline incomes (commissions without date) live in "Dinheiro na Mesa", not here
+                    const pendingDated = pending.filter((t: any) => t.hasDeadline !== false);
+                    const totalPending = pendingDated.reduce((s: number, t: any) =>
                       s + (Math.abs(t.amount) - (t.receivedAmount ?? 0)), 0);
-                    // Received = fully received + already-received portion of partial incomes
-                    const alreadyPartial = pending.reduce((s: number, t: any) =>
+                    const alreadyPartial = pendingDated.reduce((s: number, t: any) =>
                       s + (t.receivedAmount ?? 0), 0);
                     const totalReceived = received.reduce((s: number, t: any) => s + Math.abs(t.amount), 0) + alreadyPartial;
                     const totalAll = totalPending + totalReceived;
                     const receivedPct = totalAll > 0 ? (totalReceived / totalAll) * 100 : 0;
+                    const noDeadlineCount = pending.filter((t: any) => t.hasDeadline === false).length;
 
                     return (
                       <div className="space-y-6">
@@ -830,6 +832,13 @@ export default function DashboardClient({ data, currentMonth, currentYear }: { d
                               />
                             </div>
                           </div>
+                          {/* Aviso de receitas sem prazo excluídas dos totais */}
+                          {noDeadlineCount > 0 && (
+                            <p className="text-[10px] text-slate-600 mt-3">
+                              <span className="material-symbols-outlined text-[10px] align-middle mr-1">info</span>
+                              {noDeadlineCount} receita{noDeadlineCount !== 1 ? 's' : ''} sem prazo definido não entra{noDeadlineCount !== 1 ? 'm' : ''} neste total — veja em <span className="text-warning">Dinheiro na Mesa</span>.
+                            </p>
+                          )}
                         </div>
 
                         {/* Seção A Receber */}
