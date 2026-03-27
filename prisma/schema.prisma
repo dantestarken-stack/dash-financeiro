@@ -155,7 +155,7 @@ model Income {
   receivedAmount  Int            @default(0)
   type            String
   status          String
-  dueDate         DateTime
+  dueDate         DateTime?
   receivedDate    DateTime?
   competencyDate  DateTime
   isRecurring     Boolean        @default(false)
